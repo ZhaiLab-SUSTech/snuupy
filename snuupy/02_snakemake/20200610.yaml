@@ -1,0 +1,24 @@
+pipelineDir:
+  '/public/home/liuzj/projects/split_barcode/01_20200507/01_pipeline/02_pipeline0710/01_scripts/'
+resultDir:
+  '/public/home/liuzj/projects/split_barcode/01_20200507/02_result/result20200710Root/'
+nanoporeRead:
+  '/public/home/liuzj/projects/split_barcode/01_20200507/02_result/nanoporePlanD/nanopore/nanopore.fa'
+cellrangerBamFile:
+  '/public/home/liuzj/projects/singleCellEndo/02_result/after20200629/pipeline0708AllRoot/step5_runCellRanger/stepFiveTestDir/cellRanger/outs/possorted_genome_bam.bam'
+barcodeFile:
+  '/public/home/liuzj/projects/singleCellEndo/02_result/after20200629/pipeline0708AllRoot/step5_runCellRanger/stepFiveTestDir/cellRanger/outs/filtered_feature_bc_matrix/barcodes.tsv'
+genomeFile:
+  '/public/home/liuzj/data/Araport11/genome.fa.fai'
+nanoporeBamFile:
+  '/public/home/liuzj/projects/split_barcode/01_20200507/02_result/rawDataMappingResult.bam'
+penaltyMatrix:
+  '/public/home/liuzj/data/others/blosum80.mat'
+refGenome:
+  '/public/home/liuzj/data/Araport11/genome.fa'
+refAnnotaBed:
+  '/public/home/liuzj/data/Araport11/gene.bed'
+repreAnnotaBed:
+  '/public/home/liuzj/data/Araport11/araport11RepresentativeGeneModel.bed'
+window:
+  500

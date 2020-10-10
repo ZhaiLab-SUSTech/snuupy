@@ -1,0 +1,111 @@
+configfile: "/public/home/liuzj/scripts/pipeline/extractUsefulBaseForCellranger/snakemake/config.yaml"
+pipelineDir = config['pipelineDir']
+
+
+rule all:
+    input:
+        step6Finished = f"{config['resultDir']}step6_rerunCellRanger/step6Finished.empty"
+
+rule runCellRanger:
+    input:
+        inputFastqDir = config['inputFastqDir']
+    output:
+        step1Finished = f"{config['resultDir']}step1_runCellRanger/step1Finished.empty"
+    params:
+        cellRangerRef = config['cellRangerRef'],
+        cellRangerDir = f"{config['resultDir']}step1_runCellRanger/cellRangerDir/",
+        gpu = "0"
+
+    threads:56
+    shell:
+        """
+cd {pipelineDir}
+mkdir {params.cellRangerDir} && cd {params.cellRangerDir} && cellranger count --id=cellranger --fastqs={input.inputFastqDir} --transcriptome={params.cellRangerRef} --localcores={threads} --r1-length=28 && touch {output.step1Finished}
+        """
+
+rule splitBam:
+    input:
+        step1Finished = f"{config['resultDir']}step1_runCellRanger/step1Finished.empty"
+    output:
+        step2Finished = f"{config['resultDir']}step2_splitBam/step2Finished.empty"
+    params:
+        splitedDir = f"{config['resultDir']}step2_splitBam/splitedDir/",
+        step1ResultDir = f"{config['resultDir']}step1_runCellRanger/",
+        step01SplitedCounts = 64,
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+python step02_splitBam.py -i {params.step1ResultDir}/cellRangerDir/cellranger/outs/possorted_genome_bam.bam -o {params.splitedDir} -t {params.step01SplitedCounts} &&    touch {output.step2Finished}
+        """
+
+rule getOverlapInfo:
+    input:
+        step2Finished = f"{config['resultDir']}step2_splitBam/step2Finished.empty"
+    output:
+        overlapInfo = f"{config['resultDir']}step3_getOverlapInfo/overlapInfo.tsv"
+    params:
+        splitedDir = f"{config['resultDir']}step2_splitBam/splitedDir/",
+        gpu = "0"
+
+    threads:56
+    shell:
+        """
+cd {pipelineDir}
+python step03_getOverlapInfo.py -i {params.splitedDir} -o {output.overlapInfo} -t {threads}
+        """
+
+rule getUsefulRegion:
+    input:
+        overlapInfo = f"{config['resultDir']}step3_getOverlapInfo/overlapInfo.tsv"
+    output:
+        step4Finished = f"{config['resultDir']}step4_getUsefulRegion/step4Finished.empty"
+    params:
+        lmdbFile = f"{config['resultDir']}step4_getUsefulRegion/lmdbFile/",
+        gpu = "0"
+
+    threads:56
+    shell:
+        """
+cd {pipelineDir}
+python step04_getUsefulRegion.py -i {input.overlapInfo} -o {params.lmdbFile} -t {threads} &&    touch {output.step4Finished}
+        """
+
+rule extractSeq:
+    input:
+        step4Finished = f"{config['resultDir']}step4_getUsefulRegion/step4Finished.empty",
+        inputFastqDir = config['inputFastqDir']
+    output:
+        step5Finished = f"{config['resultDir']}step5_extractSeq/step5Finished.empty"
+    params:
+        lmdbFile = f"{config['resultDir']}step4_getUsefulRegion/lmdbFile/",
+        usefulRegionFastq = f"{config['resultDir']}step5_extractSeq/usefulRegionFastq/",
+        gpu = "0"
+
+    threads:56
+    shell:
+        """
+cd {pipelineDir}
+python step05_extractSeq.py -i {input.inputFastqDir} -o {params.usefulRegionFastq} -l {params.lmdbFile} -t {threads} -s &&    touch {output.step5Finished}
+        """
+
+rule rerunCellRanger:
+    input:
+        step5Finished = f"{config['resultDir']}step5_extractSeq/step5Finished.empty"
+    output:
+        step6Finished = f"{config['resultDir']}step6_rerunCellRanger/step6Finished.empty"
+    params:
+        usefulRegionFastq = f"{config['resultDir']}step5_extractSeq/usefulRegionFastq/",
+        rerunCellRangerDir = f"{config['resultDir']}step6_rerunCellRanger/rerunCellRangerDir/",
+        cellRangerRef = config['cellRangerRef'],
+        gpu = "0"
+
+    threads:56
+    shell:
+        """
+cd {pipelineDir}
+mkdir {params.rerunCellRangerDir} &&     cd {params.rerunCellRangerDir} &&         cellranger count --id=cellranger --fastqs={params.usefulRegionFastq} --transcriptome={params.cellRangerRef} --localcores={threads} --r1-length=28 &&             touch {output.step6Finished}
+        """
+

@@ -1,0 +1,282 @@
+configfile: "/public/home/liuzj/projects/singleCell/01_pipeline/pipeline_planC/02_snakemake/20200610.yaml"
+pipelineDir = config['pipelineDir']
+
+
+rule all:
+    input:
+        step12Finished = f"{config['resultDir']}step12_generateExpressionMatrix/step12Finished.empty",
+        irRatio = f"{config['resultDir']}step15_calculateGeneIntronRatio/irRatio.tsv"
+
+rule mapRawNanopore:
+    input:
+        nanoporeRead = config['nanoporeRead'],
+        refAnnotaBed = config['refAnnotaBed'],
+        refGenome = config['refGenome']
+    output:
+        nanoporeBam = f"{config['resultDir']}step0_mapRawNanopore/nanoporeBam.bam"
+    params:
+        nanoporeBamUnsorted = f"{config['resultDir']}step0_mapRawNanopore/nanoporeBamUnsorted.bam",
+        nanoporeSam = f"{config['resultDir']}step0_mapRawNanopore/nanoporeSam.sam",
+        gpu = "0"
+
+    threads:48
+    shell:
+        """
+cd {pipelineDir}
+minimap2 -ax splice --secondary=no -uf --MD --sam-hit-only -t {threads} --junc-bed {input.refAnnotaBed} {input.refGenome} {input.nanoporeRead} > {params.nanoporeSam} &&
+
+    samtools view -Sb {params.nanoporeSam} -o {params.nanoporeBamUnsorted} &&        samtools sort {params.nanoporeBamUnsorted} -o {output.nanoporeBam} &&            samtools index {output.nanoporeBam}
+        """
+
+#parse illumina bam
+rule parseIllumina:
+    input:
+        cellrangerBamFile = config['cellrangerBamFile'],
+        genomeFile = config['genomeFile'],
+        barcodeFile = config['barcodeFile']
+    output:
+        illuminaParsed = f"{config['resultDir']}step1_parseIllumina/illuminaParsed.index"
+    params:
+        window = config['window'],
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+python ./step01_parseIllumina.py --bam {input.cellrangerBamFile} --barcode {input.barcodeFile} --genome {input.genomeFile} --window {params.window} --parsed {output.illuminaParsed}
+        """
+
+rule addUnmappedBaseTag:
+    input:
+        nanoporeBam = f"{config['resultDir']}step0_mapRawNanopore/nanoporeBam.bam",
+        nanoporeRead = config['nanoporeRead']
+    output:
+        addUnmappedBase = f"{config['resultDir']}step2_addUnmappedBaseTag/addUnmappedBase.Bam"
+    params:
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+python ./step02_addUnmappedBaseTag.py -i {input.nanoporeBam} -f {input.nanoporeRead} -o {output.addUnmappedBase}
+        """
+
+rule generateNanoporeWindow:
+    input:
+        genomeFile = config['genomeFile'],
+        addUnmappedBase = f"{config['resultDir']}step2_addUnmappedBaseTag/addUnmappedBase.Bam"
+    output:
+        step03Finished = f"{config['resultDir']}step3_generateNanoporeWindow/step03Finished.empty"
+    params:
+        nanoporeWindow = f"{config['resultDir']}step3_generateNanoporeWindow/nanoporeWindow/",
+        window = config['window'],
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+python step03_generateNanoporeWindow.py -g {input.genomeFile} -b {input.addUnmappedBase} -w {params.window} -o {params.nanoporeWindow} &&touch {output.step03Finished}
+        """
+
+rule genrateIlluminaWindow:
+    input:
+        illuminaParsed = f"{config['resultDir']}step1_parseIllumina/illuminaParsed.index"
+    output:
+        step04Finished = f"{config['resultDir']}step4_genrateIlluminaWindow/step04Finished.empty"
+    params:
+        illuminaWindow = f"{config['resultDir']}step4_genrateIlluminaWindow/illuminaWindow/",
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+python step04_generateIlluminaWindow.py -i {input.illuminaParsed} -o {params.illuminaWindow} &&touch {output.step04Finished}
+        """
+
+rule windowBlast:
+    input:
+        step03Finished = f"{config['resultDir']}step3_generateNanoporeWindow/step03Finished.empty",
+        step04Finished = f"{config['resultDir']}step4_genrateIlluminaWindow/step04Finished.empty"
+    output:
+        blastAllResult = f"{config['resultDir']}step5_windowBlast/blastAllResult.result"
+    params:
+        nanoporeWindow = f"{config['resultDir']}step3_generateNanoporeWindow/nanoporeWindow/",
+        illuminaWindow = f"{config['resultDir']}step4_genrateIlluminaWindow/illuminaWindow/",
+        blastResultDir = f"{config['resultDir']}step5_windowBlast/blastResultDir/",
+        gpu = "0"
+
+    threads:48
+    shell:
+        """
+cd {pipelineDir}
+python step05_windowBlast.py -i {params.illuminaWindow} -n {params.nanoporeWindow} -t {threads} -o {params.blastResultDir} &&cat {params.blastResultDir}*/*/*.result > {output.blastAllResult}
+        """
+
+rule getMismatch:
+    input:
+        blastAllResult = f"{config['resultDir']}step5_windowBlast/blastAllResult.result",
+        addUnmappedBase = f"{config['resultDir']}step2_addUnmappedBaseTag/addUnmappedBase.Bam"
+    output:
+        mismatchResult = f"{config['resultDir']}step6_getMismatch/mismatchResult.feather"
+    params:
+        gpu = "0"
+
+    threads:48
+    shell:
+        """
+cd {pipelineDir}
+python step06_getMismatch.py -i {input.blastAllResult} -b {input.addUnmappedBase} -t {threads} -o {output.mismatchResult}
+        """
+
+rule parseMismatchResult:
+    input:
+        mismatchResult = f"{config['resultDir']}step6_getMismatch/mismatchResult.feather"
+    output:
+        nanoporeReadWithBarcode = f"{config['resultDir']}step7_parseMismatchResult/nanoporeReadWithBarcode.feather"
+    params:
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+python step07_parseMismatchResult.py -i {input.mismatchResult} -o {output.nanoporeReadWithBarcode}
+        """
+
+rule polishRead:
+    input:
+        nanoporeReadWithBarcode = f"{config['resultDir']}step7_parseMismatchResult/nanoporeReadWithBarcode.feather",
+        nanoporeRead = config['nanoporeRead'],
+        penaltyMatrix = config['penaltyMatrix']
+    output:
+        polishedRead = f"{config['resultDir']}step8_polishRead/polishedRead.fa"
+    params:
+        polishedReadDir = f"{config['resultDir']}step8_polishRead/polishedReadDir/",
+        polishedReadTempDir = f"{config['resultDir']}step8_polishRead/polishedReadTempDir/",
+        polishedReadRev = f"{config['resultDir']}step8_polishRead/polishedReadRev.fa",
+        gpu = "0"
+
+    threads:64
+    shell:
+        """
+cd {pipelineDir}
+python step08_polishRead.py -i {input.nanoporeReadWithBarcode} -f {input.nanoporeRead} -T {params.polishedReadTempDir} -F {params.polishedReadDir} -o {params.polishedReadRev} -t {threads} -p {input.penaltyMatrix} &&     seqkit seq -rp {params.polishedReadRev} -t DNA > {output.polishedRead} &&         rm {params.polishedReadRev}
+        """
+
+rule mapMolToGenome:
+    input:
+        refGenome = config['refGenome'],
+        refAnnotaBed = config['refAnnotaBed'],
+        polishedRead = f"{config['resultDir']}step8_polishRead/polishedRead.fa"
+    output:
+        molMappingResult = f"{config['resultDir']}step9_mapMolToGenome/molMappingResult.bam"
+    params:
+        molMappingResultUnsorted = f"{config['resultDir']}step9_mapMolToGenome/molMappingResultUnsorted.bam",
+        gpu = "0"
+
+    threads:50
+    shell:
+        """
+cd {pipelineDir}
+minimap2 -ax splice --secondary=no -uf --MD --sam-hit-only -t {threads} --junc-bed {input.refAnnotaBed} {input.refGenome} {input.polishedRead} | samtools view -Sb - -o {params.molMappingResultUnsorted} && samtools sort {params.molMappingResultUnsorted} -o {output.molMappingResult} && samtools index {output.molMappingResult}
+        """
+
+rule extractOverlapWithAnno:
+    input:
+        molMappingResult = f"{config['resultDir']}step9_mapMolToGenome/molMappingResult.bam",
+        refAnnotaBed = config['refAnnotaBed']
+    output:
+        molOverlapResult = f"{config['resultDir']}step10_extractOverlapWithAnno/molOverlapResult.bed"
+    params:
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+bedtools intersect -abam {input.molMappingResult} -b {input.refAnnotaBed} -wo -s -split -bed > {output.molOverlapResult}
+        """
+
+rule parseBedtoolsOutput:
+    input:
+        molOverlapResult = f"{config['resultDir']}step10_extractOverlapWithAnno/molOverlapResult.bed"
+    output:
+        parseBedtoolsResult = f"{config['resultDir']}step11_parseBedtoolsOutput/parseBedtoolsResult.pkl"
+    params:
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+python step11_parseBedtoolsOutput.py -i {input.molOverlapResult} -o {output.parseBedtoolsResult}
+        """
+
+rule generateExpressionMatrix:
+    input:
+        parseBedtoolsResult = f"{config['resultDir']}step11_parseBedtoolsOutput/parseBedtoolsResult.pkl"
+    output:
+        step12Finished = f"{config['resultDir']}step12_generateExpressionMatrix/step12Finished.empty"
+    params:
+        step12ResultDir = f"{config['resultDir']}step12_generateExpressionMatrix/",
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+python step12_generateExpressionMatrix.py -i {input.parseBedtoolsResult} -o {params.step12ResultDir} &&    touch {output.step12Finished}
+        """
+
+rule getSplieStats:
+    input:
+        molMappingResult = f"{config['resultDir']}step9_mapMolToGenome/molMappingResult.bam",
+        repreAnnotaBed = config['repreAnnotaBed']
+    output:
+        overlapWithRefBed = f"{config['resultDir']}step13_getSplieStats/overlapWithRefBed.bed",
+        intronRetationInfo = f"{config['resultDir']}step13_getSplieStats/intronRetationInfo.tsv"
+    params:
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+bedtools intersect -abam {input.molMappingResult} -b {input.repreAnnotaBed} -wo -s -split -bed > {output.overlapWithRefBed} &&    python step13_getSpliceStats.py -i {output.overlapWithRefBed} -o {output.intronRetationInfo}
+        """
+
+rule getIrInfo:
+    input:
+        parseBedtoolsResult = f"{config['resultDir']}step11_parseBedtoolsOutput/parseBedtoolsResult.pkl",
+        intronRetationInfo = f"{config['resultDir']}step13_getSplieStats/intronRetationInfo.tsv"
+    output:
+        irInfo = f"{config['resultDir']}step14_getIrInfo/irInfo.tsv"
+    params:
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+python step14_getIrInfo.py -i {input.intronRetationInfo} -g {input.parseBedtoolsResult} -o {output.irInfo}
+        """
+
+rule calculateGeneIntronRatio:
+    input:
+        irInfo = f"{config['resultDir']}step14_getIrInfo/irInfo.tsv"
+    output:
+        irRatio = f"{config['resultDir']}step15_calculateGeneIntronRatio/irRatio.tsv"
+    params:
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+python step15_calculateGeneIntronRatio.py -i {input.irInfo} -o {output.irRatio}
+        """
+

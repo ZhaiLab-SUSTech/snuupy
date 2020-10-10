@@ -1,0 +1,8 @@
+pipelineDir:
+  './scripts/'
+resultDir:
+  './results/'
+inputFastqDir:
+  '/rawData/inputFastq/'
+cellRangerRef:
+  '/tair10'
