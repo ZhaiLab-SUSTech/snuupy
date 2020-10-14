@@ -1,0 +1,83 @@
+configfile: "/public/home/liuzj/publicPipeline/snuupy/snakemake/config.yaml"
+pipelineDir = config['pipelineDir']
+
+
+rule all:
+    input:
+        parseIlluminaResults = f"{config['resultDir']}step4_parseIllumina/parseIlluminaResults.index"
+
+rule runCellRanger:
+    input:
+        firstRunCellRangerConfig = config['firstRunCellRangerConfig']
+    output:
+        runCellRangerFinished = f"{config['resultDir']}step1_runCellRanger/runCellRangerFinished.empty"
+    params:
+        gpu = "0"
+
+    threads:2
+    shell:
+        """
+cd {pipelineDir}
+python ./optimizedCellRanger/optimizedCellRanger.py runCellRanger -p {input.firstRunCellRangerConfig} &&touch {output.runCellRangerFinished}
+        """
+
+rule extractExonBases:
+    input:
+        runCellRangerFinished = f"{config['resultDir']}step1_runCellRanger/runCellRangerFinished.empty"
+    output:
+        extractExonBasesFinished = f"{config['resultDir']}step2_extractExonBases/extractExonBasesFinished.empty"
+    params:
+        extractExonBasesTemp = f"{config['resultDir']}step2_extractExonBases/extractExonBasesTemp/",
+        extractExonBasesFastq = f"{config['resultDir']}step2_extractExonBases/extractExonBasesFastq/",
+        picardPath = config['picardPath'],
+        geneAnnoBed = config['geneAnnoBed'],
+        illuminaFastqs = config['illuminaFastqs'],
+        extractExonBasesCutoff = 30,
+        extractExonBasesInBam = f"{config['resultDir']}step1_runCellRanger/test/outs/possorted_genome_bam.bam",
+        gpu = "0"
+
+    threads:2
+    shell:
+        """
+cd {pipelineDir}
+python ./optimizedCellRanger/optimizedCellRanger.py extractExonBases --bam {params.extractExonBasesInBam} --temp {params.extractExonBasesTemp} -t {threads} --picard {params.picardPath}     --bed {params.geneAnnoBed} --fastq {params.illuminaFastqs} --out {params.extractExonBasesFastq} --cutoff {params.extractExonBasesCutoff} &&
+touch {output.extractExonBasesFinished}
+        """
+
+rule rerunCellRanger:
+    input:
+        extractExonBasesFinished = f"{config['resultDir']}step2_extractExonBases/extractExonBasesFinished.empty",
+        secondRunCellRangerConfig = config['secondRunCellRangerConfig']
+    output:
+        rerunCellRangerFinished = f"{config['resultDir']}step3_rerunCellRanger/rerunCellRangerFinished.empty"
+    params:
+        gpu = "0"
+
+    threads:2
+    shell:
+        """
+cd {pipelineDir}
+python ./optimizedCellRanger/optimizedCellRanger.py runCellRanger -p {input.secondRunCellRangerConfig} &&touch {output.rerunCellRangerFinished}
+        """
+
+rule parseIllumina:
+    input:
+        rerunCellRangerFinished = f"{config['resultDir']}step3_rerunCellRanger/rerunCellRangerFinished.empty"
+    output:
+        parseIlluminaResults = f"{config['resultDir']}step4_parseIllumina/parseIlluminaResults.index"
+    params:
+        genomeFai = config['genomeFai'],
+        useBarcodeGz = f"{config['resultDir']}step3_rerunCellRanger/test/outs/filtered_feature_bc_matrix/barcodes.tsv.gz",
+        useBarcode = f"{config['resultDir']}step3_rerunCellRanger/test/outs/filtered_feature_bc_matrix/barcodes.tsv",
+        rerunCellRangerBam = f"{config['resultDir']}step3_rerunCellRanger/test/outs/possorted_genome_bam.bam",
+        windowSize = 500,
+        gpu = "0"
+
+    threads:2
+    shell:
+        """
+cd {pipelineDir}
+gzip -d -c {params.useBarcodeGz} > {params.useBarcode} &&
+python ./snuupy/snuupy.py parseIllumina --bam {params.rerunCellRangerBam} --barcode {params.useBarcode} --genome {params.genomeFai} --window {params.windowSize} --parsed {output.parseIlluminaResults}
+        """
+

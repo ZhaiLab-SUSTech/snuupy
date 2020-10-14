@@ -1,30 +1,3 @@
-'''
-Description: 去除softclip大于150的read
-Author: Liuzj
-Date: 2020-09-11 15:08:23
-LastEditTime: 2020-09-11 15:09:37
-LastEditors: Liuzj
-'''
-'''
-@Author: liuzj
-@Date: 2020-06-05 14:15:02
-@LastEditors: liuzj
-@LastEditTime: 2020-07-04 16:36:55
-@Description: 
-    用于给bam添加未比对上的tag
-    JI intron情况
-            100 没有intron
-            00 intron正常
-            10 intron 5'异常
-            01 intron 3'异常
-            11 均异常
-    FL 5'截取长度
-    EL 3'截取长度
-    FS 5'截取序列
-    ES 3'截取序列
-@FilePath: /liuzj/projects/split_barcode/01_20200507/01_pipeline/00_pipeline/finalVersion/step02_addUnmappedBaseTag.py
-'''
-#!/usr/bin/env python
 import pysam
 import click
 import pyfastx
@@ -33,8 +6,7 @@ import numpy as np
 import pandas as pd
 import more_itertools as mlt
 from concurrent.futures import ThreadPoolExecutor
-from my_python_tools import getBlock, isOne
-
+from .tools import isOne, getBlock
 
 def isExceedExtend(read, introns):
     """
@@ -104,7 +76,7 @@ def singleReadProcess(read, allFasta):
         fiveLength = getClipLength(cigar, exceedExtend, 1)
         threeLength = getClipLength(cigar, exceedExtend, 0)
 
-        if (fiveLength > 180) or (threeLength > 180):
+        if (fiveLength > 150) or (threeLength > 150):
             return False
 
         length = [fiveLength, threeLength]
@@ -168,11 +140,8 @@ def outputProcessedRead(bamFileOut, processedReadList):
         bamFileOut.write(read)
 
 
-@click.command()
-@click.option('-i', 'BAM_PATH', help='minimap2 output; bam format')
-@click.option('-f', 'NANOPORE_FASTA', help='raw nanopore seq; fasta format')
-@click.option('-o', 'BAM_PATH_OUT', help='output bam')
-def main(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT):
+
+def addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT):
     global bamFile
     bamFile = pysam.AlignmentFile(BAM_PATH, 'rb')
     bamFileOut = pysam.AlignmentFile(BAM_PATH_OUT, 'wbu', template=bamFile)
@@ -193,6 +162,3 @@ def main(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT):
                                           allFastaDict).result()
     outputProcessedRead(bamFileOut, splicedResult)
     bamFileOut.close()
-
-
-main()

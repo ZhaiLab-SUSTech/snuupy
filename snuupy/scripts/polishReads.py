@@ -1,11 +1,3 @@
-"""
-@Date: 2020-06-17 12:27:25
-LastEditors: liuzj
-LastEditTime: 2020-08-06 11:39:23
-@Description: file content
-@Author: liuzj
-FilePath: /liuzj/projects/singleCell/01_pipeline/pipeline_planC/01_scripts/step08_polishRead.py
-"""
 import pandas as pd
 import numpy as np
 import time
@@ -18,10 +10,11 @@ from loguru import logger
 from concurrent.futures import ProcessPoolExecutor
 from more_itertools import chunked
 from itertools import repeat
-from jpy_tools.ReadProcess import readFasta
+from .tools import readFasta
 
 
 def GetConsensusSeq():
+    
     seq2numDict = {
     '-':4,
     'A':0,
@@ -48,14 +41,15 @@ def GetConsensusSeq():
     return _getConsensusSeq
 
 
-def getConsensesFasta(readLs, tempPath, penaltyPath, finalPath=False):
+def getConsensesFasta(readLs, tempPath, penaltyPath, poaPath, finalPath=False):
     getConsensusSeq = GetConsensusSeq()
     
     with open(f'{tempPath}_all.fa', 'w') as fh:
         for read in readLs[:10]:
             fh.write(f'>{read[0]}\n{read[1]}\n')
     
-    os.system(f'poa -read_fasta {tempPath}_all.fa -pir {tempPath}_all.aln {penaltyPath}')
+    os.system(f'{poaPath} -read_fasta {tempPath}_all.fa -pir {tempPath}_all.aln {penaltyPath}')
+    
     
     consensusSeq = getConsensusSeq(f'{tempPath}_all.aln')
     
@@ -68,11 +62,10 @@ def getConsensesFasta(readLs, tempPath, penaltyPath, finalPath=False):
     
 #     os.system(f'rm {tempPath}*')
 
-def getPolishRead(tempPath, finalPath, times=1):
-    ##效果不佳 暂且放弃
+def getPolishRead(tempPath, finalPath, minimapPath, raconPath, times=1):
     def _getPolishCommand(commandExecuted, targetFasta, useFasta, polishedFasta):
         # commandExecuted += f'bwa index -a is {targetFasta} && bwa mem {targetFasta} {useFasta} > {targetFasta}.sam && racon {useFasta} {targetFasta}.sam {targetFasta} > {polishedFasta} &&'
-        commandExecuted += f'minimap2 --secondary=no -ax map-ont {targetFasta} {useFasta} > {targetFasta}.sam && racon {useFasta} {targetFasta}.sam {targetFasta} > {polishedFasta} &&'
+        commandExecuted += f'{minimapPath} --secondary=no -ax map-ont {targetFasta} {useFasta} > {targetFasta}.sam && {raconPath} {useFasta} {targetFasta}.sam {targetFasta} > {polishedFasta} &&'
         return commandExecuted.strip()
     
     
@@ -85,7 +78,7 @@ def getPolishRead(tempPath, finalPath, times=1):
     commandExecuted = commandExecuted.strip()
     return commandExecuted
 
-def polishSeq(barcodeWithReadLs, nanoporeDict, tempDirPath, finalDirPath, penaltyPath):
+def polishSeq(barcodeWithReadLs, nanoporeDict, tempDirPath, finalDirPath, penaltyPath, minimapPath, poaPath, raconPath):
     barcodeWithReadLs = copy.deepcopy(barcodeWithReadLs)
     barcode, readLs = barcodeWithReadLs
     finalPath = f'{finalDirPath}{barcode}.fa'
@@ -114,27 +107,20 @@ def polishSeq(barcodeWithReadLs, nanoporeDict, tempDirPath, finalDirPath, penalt
     else:
         tempReadPath = f'{tempDirPath}{barcode}'
         
-        getConsensesFasta(readLs, tempReadPath, penaltyPath)
-        return getPolishRead(tempReadPath, finalPath)
+        getConsensesFasta(readLs, tempReadPath, penaltyPath, poaPath)
+        return getPolishRead(tempReadPath, finalPath,  minimapPath, raconPath)
 
-def chunkPolishSeq(chunkBarcodeWithReadIter, nanoporeReadPath, tempDirPath, finalDirPath, penaltyPath, i):
+def chunkPolishSeq(chunkBarcodeWithReadIter, nanoporeReadPath, tempDirPath, finalDirPath, penaltyPath, i, minimapPath, poaPath, raconPath):
     nanoporeRead = pyfastx.Fasta(nanoporeReadPath)
-    commandExecuted = list(map(polishSeq, chunkBarcodeWithReadIter, repeat(nanoporeRead), repeat(tempDirPath), repeat(finalDirPath), repeat(penaltyPath))) 
+    commandExecuted = list(map(polishSeq, chunkBarcodeWithReadIter, repeat(nanoporeRead), repeat(tempDirPath), repeat(finalDirPath), repeat(penaltyPath), repeat(minimapPath), repeat(poaPath), repeat(raconPath)))
     commandExecuted = ' ;\\\n'.join(commandExecuted)
     os.system(commandExecuted)
     if i % 100 == 0 :
         logger.info(f'{i*100} reads processed')
 
 
-@click.command()
-@click.option("-i", "MISMATCH_RESULT", help="step07 output")
-@click.option("-f", "NANOPORE_READ", help="original nanopore read")
-@click.option("-T", "TEMP_DIR", help="temp dir; end with /")
-@click.option("-F", "FINAL_DIR", help="polished read stored dir; end with /")
-@click.option("-o", "POLISHED_READ", help="polished read")
-@click.option("-p", "PENALTY_PATH", help="penalty matrix used by poa")
-@click.option("-t", "THREADS", type=int, help="threads")
-def main(
+
+def polishReads(
     MISMATCH_RESULT,
     NANOPORE_READ,
     TEMP_DIR,
@@ -142,9 +128,20 @@ def main(
     POLISHED_READ,
     THREADS,
     PENALTY_PATH,
-):
-    os.mkdir(TEMP_DIR)
-    os.mkdir(FINAL_DIR)
+    minimapPath,
+    poaPath,
+    raconPath,
+    seqkitPath
+):  
+    if os.path.exists(TEMP_DIR):
+        logger.warning(f"{TEMP_DIR} existed!!")
+    else:
+        os.mkdir(TEMP_DIR)
+    if os.path.exists(FINAL_DIR):
+        logger.warning(f"{FINAL_DIR} existed!!")
+    else:
+        os.mkdir(FINAL_DIR)
+
     logger.info('read mismatch results')
     mismatchResult = pd.read_feather(MISMATCH_RESULT)
     logger.info('prepare for polish')
@@ -159,19 +156,18 @@ def main(
     logger.info('start polish')
     umiReadDcIter = chunked(sameUmiReadDc.items(), 100)
     i = 0
+    allResults = []
     with ProcessPoolExecutor(THREADS) as multiP:
         for umiReadDtChunk in umiReadDcIter:
             i += 1
-            multiP.submit(chunkPolishSeq, umiReadDtChunk, NANOPORE_READ, TEMP_DIR, FINAL_DIR, PENALTY_PATH, i)
+            allResults.append(multiP.submit(chunkPolishSeq, umiReadDtChunk, NANOPORE_READ, TEMP_DIR, FINAL_DIR, PENALTY_PATH, i, minimapPath, poaPath, raconPath))
+    [x.result() for x in allResults]
     logger.info('merge all polished reads')
     time.sleep(10)
     os.system(
         f"""
-    cat {FINAL_DIR}/* > {POLISHED_READ} && sleep 15 &&\
+    cat {FINAL_DIR}* | {seqkitPath} seq -rp > {POLISHED_READ} && sleep 15 &&\
     rm -rf {FINAL_DIR} &&\
     rm -rf {TEMP_DIR}
     """
     )
-
-
-main()

@@ -1,33 +1,13 @@
-#!/usr/bin/env python
-'''
-@Author: liuzj
-@Date: 2020-05-22 12:59:40
-LastEditors: liuzj
-LastEditTime: 2020-08-28 11:02:11
-@Description: 用于解析10X cellranger结果 用于下一步
-FilePath: /liuzj/projects/singleCell/01_pipeline/pipeline_planC/01_scripts/step01_parseIllumina.py
-'''
+
 import pandas as pd
 import numpy as np
 import pysam
 import os
 import h5py
-import click
 
-
-@click.command()
-@click.option('--bam', 'secondBam', help='cellranger result')
-@click.option('--barcode',
-              'secondIndex',
-              help='the filtered barcode list which is output by cellranger')
-@click.option('--genome', 'genomeIndex', help='the fai format file')
-@click.option('--window', 'windowSize', type=int, default=5000)
-@click.option('--parsed',
-              'parsedIndex',
-              help='the parsedIndex; should end with .index')
-def main(secondBam, secondIndex, genomeIndex, windowSize, parsedIndex):
+def parseIllumina(secondBam, secondIndex, genomeIndex, windowSize, parsedIndex, useColumn):
     genomeIndex = pd.read_csv(genomeIndex, sep='\t',
-                              header=None).iloc[:5]  #只保留染色体部分
+                              header=None).iloc[:useColumn]  #只保留染色体部分
     secondIndex = pd.read_csv(secondIndex, header=None)
     secondIndex[0] = secondIndex[0].str.split('-', expand=True)[0]
     secondIndex = set(secondIndex[0])
@@ -62,7 +42,3 @@ def main(secondBam, secondIndex, genomeIndex, windowSize, parsedIndex):
 
     #输出结果
     indexH5.close()
-
-
-if __name__ == '__main__':
-    main()

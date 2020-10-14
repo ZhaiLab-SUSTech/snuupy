@@ -1,14 +1,12 @@
 '''
-@Date: 2020-06-08 12:43:38
-@LastEditors: liuzj
-@LastEditTime: 2020-06-08 14:18:15
-@Description: 用于获得每个window里的illumina read
-@Author: liuzj
-@FilePath: /liuzj/projects/split_barcode/01_20200507/01_pipeline/00_pipeline/finalVersion/step04_generateIlluminaWindow.py
+Description: 
+Author: Liuzj
+Date: 2020-10-13 16:01:15
+LastEditTime: 2020-10-13 16:06:45
+LastEditors: Liuzj
 '''
 import os
 import h5py
-import click
 
 def generateOneWindow(chrPath, barcodes):
     os.mkdir(chrPath)
@@ -29,10 +27,8 @@ def generateOneSubWindow(subWindowPath, barcodes):
             fh.write(singleContent)
 
 
-@click.command()
-@click.option('-i', 'ILLUMINA_INDEX', help='step01 output')
-@click.option('-o', 'OUT_DIR', help='illumina window dir; must end with /')
-def main(ILLUMINA_INDEX, OUT_DIR):
+
+def generateIlluminaWindow(ILLUMINA_INDEX, OUT_DIR):
     os.system(f'mkdir {OUT_DIR}')
     parsedIndex = h5py.File(ILLUMINA_INDEX,'r')
     for chr_ in parsedIndex.keys():
@@ -42,4 +38,3 @@ def main(ILLUMINA_INDEX, OUT_DIR):
             currentWindowPath = currentChr + singleWindow + '/'
             windowBarcodes = parsedIndex[f'{chr_}/{singleWindow}'].value.astype(str)
             generateOneWindow(currentWindowPath, windowBarcodes)
-main()

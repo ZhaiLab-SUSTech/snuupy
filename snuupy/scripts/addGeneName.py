@@ -1,32 +1,26 @@
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-'''
-Description: 添加isoform注释解析 <naive>
-Date: 2020-09-18 19:34:16
-LastEditTime: 2020-09-25 13:29:43
-LastEditors: Liuzj
-'''
-'''
-@Author       : windz
-@Date         : 2020-06-04 11:53:34
-LastEditTime: 2020-09-18 19:34:23
-@Description  : 
-'''
-
+import sh
 from collections import defaultdict
 import pickle
 import numpy as np
 import pandas as pd
 import joblib
-import click
+import pysam
+from io import StringIO
+from loguru import logger
+from .tools import bedtoolsGetIntersect
+
+def addGeneTag(readWithGeneInformation, inBamPath, outBamPath, geneIdTag):
+    readWithGeneInformation = {x:y['gene_id'] for x,y in readWithGeneInformation.items()}
+    with pysam.AlignmentFile(inBamPath) as inBam:
+        with pysam.AlignmentFile(outBamPath, 'wb', template=inBam) as outBam:
+            for read in inBam:
+                readGeneId = readWithGeneInformation.get(read.qname, 'None')
+                read.set_tag(geneIdTag, readGeneId)
+                outBam.write(read)
+    pysam.index(outBamPath)
 
 
-import logging
-logging.basicConfig(level=logging.DEBUG,  
-                    format='%(asctime)s %(filename)s: %(message)s',  
-                    datefmt='%m/%d/%Y %I:%M:%S %p',
-                    )
+
 
 
 NAMES=[
@@ -41,29 +35,27 @@ USECOLS = [
     ]
 
 
+def addGeneName(inBamPath, bedAnno, outfile, bedtoolsPath, outBamPath, geneIdTag):
+    intersectBuff = bedtoolsGetIntersect(inBamPath, bedAnno, bedtoolsPath)
 
-@click.command()
-@click.option('-i', '--infile', required=True)
-@click.option('-o', '--outfile', required=True)
-def main(infile, outfile):
-    logging.info('Start read csv')
+    logger.info('Start read csv')
     df = pd.read_csv(
-        infile, 
+        intersectBuff, 
         sep='\t', 
         names=NAMES,
         usecols=USECOLS,
         header=None
         )
-    logging.info('Read csv Done!')
+    logger.info('Read csv Done!')
 
-    logging.info('Start find Splice Sites')
+    logger.info('Start find Splice Sites')
     df['geneBlockSizes'] = df['geneBlockSizes'].map(lambda x: np.fromstring(x, sep=','))
     df['geneBlockStarts'] = df['geneBlockStarts'].map(lambda x: np.fromstring(x, sep=','))
     df['five_ss'] = (df['geneStart']+df['geneBlockSizes']+df['geneBlockStarts']).map(lambda x: x[:-1])
     df['three_ss'] = (df['geneStart']+df['geneBlockStarts']).map(lambda x: x[1:])
-    logging.info('Find Splice Sites Done!')
+    logger.info('Find Splice Sites Done!')
 
-    logging.info('Main function')
+    logger.info('Main function')
 
     df['geneName'] = df['geneName'].str.split('\|\|').str[0]
     specificLine = df['geneName'].str.endswith('_specific')
@@ -95,7 +87,7 @@ def main(infile, outfile):
             results[item.Name]['gene_id'] = item.geneName.split('.')[0]
             results[item.Name]['gene_len'] = item.geneEnd - item.geneStart
 
-    logging.info('Gene Assign Done!')
+    logger.info('Gene Assign Done!')
 
     specificDf['geneNameTrue'] = specificDf['geneName'].str.split('.').str[0]
     specificDf['geneAssignGene'] = specificDf.pipe(lambda x: x['Name'].map(lambda y:results[y]['gene_id']))
@@ -128,11 +120,14 @@ def main(infile, outfile):
 
 
 
-    logging.info('Main function Done!')
+    logger.info('Main function Done!')
     
     with open(outfile, 'wb') as o:
         pickle.dump(dict(results), o)
     
+    addGeneTag(dict(results), inBamPath, outBamPath, geneIdTag)
+    
 
-if __name__ == "__main__":
-    main()
+
+    
+

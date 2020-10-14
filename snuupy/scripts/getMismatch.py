@@ -1,15 +1,8 @@
-'''
-@Date: 2020-06-10 12:27:26
-@LastEditors: liuzj
-@LastEditTime: 2020-06-16 12:49:03
-@Description: 利用bio.aligen解析blast结果 获得mismatch
-@Author: liuzj
-@FilePath: /liuzj/projects/split_barcode/01_20200507/01_pipeline/00_pipeline/finalVersion/step06_getMismatch.py
-'''
+
 import click
 import pysam
 import pandas as pd
-import jpy_tools.ReadProcess as jrp
+from .tools import sequence as jseq
 from Bio import Align
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
@@ -39,25 +32,22 @@ def getAlignScore(line):
     else:
         mappingStrand = 1
 
-    bestAlign = mappingResult[bestScoreIndex ][0]
+    bestAlign = mappingResult[bestScoreIndex][0]
     seqAlignedSeq = bestAlign.query[bestAlign.aligned[1][0][0]:bestAlign.aligned[1][-1][-1]]
 
-    umiScore = aligner.align(umi, seqAlignedSeq).score
+
     barcodeScore = aligner.align(barcode, seqAlignedSeq).score
+    umiScore = barcodeUmiScore - barcodeScore
     return [str(x) for x in [barcodeUmiScore, barcodeScore, umiScore, mappingStrand]]
 
 
-@click.command()
-@click.option('-i', 'MAPPING_RESULT', help = 'mergerd blast result')
-@click.option('-b', 'ADD_SEQ_BAM', help = 'bam added unmapped seq tag')
-@click.option('-o', 'OUT_FEATHER', help = 'output feather')
-@click.option('-t', 'THREADS', type=int, help = 'threads')
-def main(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS):
+
+def getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS):
     blastResult = pd.read_csv(MAPPING_RESULT, sep='\t', header=None,\
                          names =  'qseqid sseqid length qstart qend mismatch gaps bitscore score'.split(' '))
     addSeqBam = pysam.AlignmentFile(ADD_SEQ_BAM,'r')
 
-    seqTransformer = jrp.sequence()
+    seqTransformer = jseq()
     bamDict = defaultdict(lambda:[])
 
     for x in addSeqBam:
@@ -96,6 +86,3 @@ def main(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS):
     blastResult.reset_index(drop=True, inplace=True)
 
     blastResult.to_feather(OUT_FEATHER)
-
-
-main()

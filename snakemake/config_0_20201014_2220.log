@@ -1,0 +1,178 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cluster nodes: 128
+Job counts:
+	count	jobs
+	1	all
+	1	extractExonBases
+	1	runCellRanger
+	3
+Welcome to the CBC MILP Solver 
+Version: 2.9.0 
+Build Date: Feb 12 2015 
+
+command line - /public/home/liuzj/softwares/anaconda3/lib/python3.8/site-packages/pulp/apis/../solverdir/cbc/linux/64/cbc /tmp/16c65478123a4147a1ddd32c352532cd-pulp.mps max ratio None allow None threads None presolve on strong None gomory on knapsack on probing on branch printingOptions all solution /tmp/16c65478123a4147a1ddd32c352532cd-pulp.sol (default strategy 1)
+At line 2 NAME          MODEL
+At line 3 ROWS
+At line 7 COLUMNS
+At line 13 RHS
+At line 16 BOUNDS
+At line 18 ENDATA
+Problem MODEL has 2 rows, 1 columns and 2 elements
+Coin0008I MODEL read with 0 errors
+String of None is illegal for double parameter ratioGap value remains 0
+String of None is illegal for double parameter allowableGap value remains 0
+String of None is illegal for integer parameter threads value remains 0
+String of None is illegal for integer parameter strongBranching value remains 5
+Option for gomoryCuts changed from ifmove to on
+Option for knapsackCuts changed from ifmove to on
+Continuous objective value is 3 - 0.00 seconds
+Cgl0004I processed model has 0 rows, 0 columns (0 integer (0 of which binary)) and 0 elements
+Cbc3007W No integer variables - nothing to do
+Cuts at root node changed objective from -3 to -1.79769e+308
+Probing was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+Gomory was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+Knapsack was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+Clique was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+MixedIntegerRounding2 was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+FlowCover was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+TwoMirCuts was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+
+Result - Optimal solution found
+
+Objective value:                3.00000000
+Enumerated nodes:               0
+Total iterations:               0
+Time (CPU seconds):             0.00
+Time (Wallclock seconds):       0.00
+
+Option for printingOptions changed from normal to all
+Total time (CPU seconds):       0.00   (Wallclock seconds):       0.00
+
+
+[Wed Oct 14 22:20:37 2020]
+rule runCellRanger:
+    input: /public/home/liuzj/publicPipeline/snuupy/optimizedCellRanger/cellRangerParameter.yaml
+    output: /public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/step1_runCellRanger/runCellRangerFinished.empty
+    jobid: 2
+    threads: 2
+
+
+cd /public/home/liuzj/publicPipeline/snuupy/
+python ./optimizedCellRanger/optimizedCellRanger.py runCellRanger -p /public/home/liuzj/publicPipeline/snuupy/optimizedCellRanger/cellRangerParameter.yaml &&touch /public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/step1_runCellRanger/runCellRangerFinished.empty
+        
+Submitted job 2 with external jobid 'jsub Id: 451177'.
+[Wed Oct 14 22:29:17 2020]
+Finished job 2.
+1 of 3 steps (33%) done
+Welcome to the CBC MILP Solver 
+Version: 2.9.0 
+Build Date: Feb 12 2015 
+
+command line - /public/home/liuzj/softwares/anaconda3/lib/python3.8/site-packages/pulp/apis/../solverdir/cbc/linux/64/cbc /tmp/89523d35a6e74b9ca8015325f99cbdaf-pulp.mps max ratio None allow None threads None presolve on strong None gomory on knapsack on probing on branch printingOptions all solution /tmp/89523d35a6e74b9ca8015325f99cbdaf-pulp.sol (default strategy 1)
+At line 2 NAME          MODEL
+At line 3 ROWS
+At line 7 COLUMNS
+At line 13 RHS
+At line 16 BOUNDS
+At line 18 ENDATA
+Problem MODEL has 2 rows, 1 columns and 2 elements
+Coin0008I MODEL read with 0 errors
+String of None is illegal for double parameter ratioGap value remains 0
+String of None is illegal for double parameter allowableGap value remains 0
+String of None is illegal for integer parameter threads value remains 0
+String of None is illegal for integer parameter strongBranching value remains 5
+Option for gomoryCuts changed from ifmove to on
+Option for knapsackCuts changed from ifmove to on
+Continuous objective value is 3 - 0.00 seconds
+Cgl0004I processed model has 0 rows, 0 columns (0 integer (0 of which binary)) and 0 elements
+Cbc3007W No integer variables - nothing to do
+Cuts at root node changed objective from -3 to -1.79769e+308
+Probing was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+Gomory was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+Knapsack was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+Clique was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+MixedIntegerRounding2 was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+FlowCover was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+TwoMirCuts was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+
+Result - Optimal solution found
+
+Objective value:                3.00000000
+Enumerated nodes:               0
+Total iterations:               0
+Time (CPU seconds):             0.00
+Time (Wallclock seconds):       0.00
+
+Option for printingOptions changed from normal to all
+Total time (CPU seconds):       0.00   (Wallclock seconds):       0.00
+
+
+[Wed Oct 14 22:29:17 2020]
+rule extractExonBases:
+    input: /public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/step1_runCellRanger/runCellRangerFinished.empty
+    output: /public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/step2_extractExonBases/extractExonBasesFinished.empty
+    jobid: 1
+    threads: 2
+
+
+cd /public/home/liuzj/publicPipeline/snuupy/
+python ./optimizedCellRanger/optimizedCellRanger.py extractExonBases --bam /public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/step1_runCellRanger/test/outs/possorted_genome_bam.bam --temp /public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/step2_extractExonBases/extractExonBasesTemp/ -t 2 --picard /public/home/liuzj/softwares/picard/picard.jar     --bed /public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/gene.bed --fastq /public/home/liuzj/publicPipeline/snuupy/example/00_data/illuminaFastq/ --out /public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/step2_extractExonBases/extractExonBasesFastq/ --cutoff 30 &&
+touch /public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/step2_extractExonBases/extractExonBasesFinished.empty
+        
+Submitted job 1 with external jobid 'jsub Id: 451179'.
+[Wed Oct 14 22:30:37 2020]
+Finished job 1.
+2 of 3 steps (67%) done
+Welcome to the CBC MILP Solver 
+Version: 2.9.0 
+Build Date: Feb 12 2015 
+
+command line - /public/home/liuzj/softwares/anaconda3/lib/python3.8/site-packages/pulp/apis/../solverdir/cbc/linux/64/cbc /tmp/13864bbb11324b9897d966d42e198a3f-pulp.mps max ratio None allow None threads None presolve on strong None gomory on knapsack on probing on branch printingOptions all solution /tmp/13864bbb11324b9897d966d42e198a3f-pulp.sol (default strategy 1)
+At line 2 NAME          MODEL
+At line 3 ROWS
+At line 7 COLUMNS
+At line 13 RHS
+At line 16 BOUNDS
+At line 18 ENDATA
+Problem MODEL has 2 rows, 1 columns and 2 elements
+Coin0008I MODEL read with 0 errors
+String of None is illegal for double parameter ratioGap value remains 0
+String of None is illegal for double parameter allowableGap value remains 0
+String of None is illegal for integer parameter threads value remains 0
+String of None is illegal for integer parameter strongBranching value remains 5
+Option for gomoryCuts changed from ifmove to on
+Option for knapsackCuts changed from ifmove to on
+Continuous objective value is 2 - 0.00 seconds
+Cgl0004I processed model has 0 rows, 0 columns (0 integer (0 of which binary)) and 0 elements
+Cbc3007W No integer variables - nothing to do
+Cuts at root node changed objective from -2 to -1.79769e+308
+Probing was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+Gomory was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+Knapsack was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+Clique was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+MixedIntegerRounding2 was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+FlowCover was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+TwoMirCuts was tried 0 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+
+Result - Optimal solution found
+
+Objective value:                2.00000000
+Enumerated nodes:               0
+Total iterations:               0
+Time (CPU seconds):             0.00
+Time (Wallclock seconds):       0.00
+
+Option for printingOptions changed from normal to all
+Total time (CPU seconds):       0.00   (Wallclock seconds):       0.00
+
+
+[Wed Oct 14 22:30:37 2020]
+localrule all:
+    input: /public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/step2_extractExonBases/extractExonBasesFinished.empty
+    jobid: 0
+
+[Wed Oct 14 22:30:37 2020]
+Finished job 0.
+3 of 3 steps (100%) done
+Complete log: /public/home/liuzj/publicPipeline/snuupy/snakemake/.snakemake/log/2020-10-14T222037.173641.snakemake.log

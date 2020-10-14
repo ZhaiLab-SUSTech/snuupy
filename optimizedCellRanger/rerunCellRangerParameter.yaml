@@ -1,0 +1,14 @@
+cellRangerPath:
+  '/public/home/liuzj/softwares/cellranger/cellranger-3.1.0/cellranger'
+outDir:
+  '/public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/step3_rerunCellRanger/'
+id:
+  'test'
+fastqs:
+  '/public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/step2_extractExonBases/extractExonBasesFastq/'
+transcriptome:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/cellRangerRef/'
+localcores:
+  2
+force-cells:
+  10

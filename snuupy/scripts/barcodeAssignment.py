@@ -1,19 +1,8 @@
-'''
-@Date: 2020-06-10 14:06:50
-LastEditors: Liuzj
-LastEditTime: 2020-09-11 19:07:41
-@Description: 目前使用的策略 总体mismatch不大于6 分别不大于4
-@Author: liuzj
-@FilePath: /liuzj/projects/split_barcode/01_20200507/01_pipeline/00_pipeline/finalVersion/step07_parseMismatchResult.py
-'''
-import click
 import pandas as pd
 
 
-@click.command()
-@click.option('-i', 'MISMATCH_RESULT', help='step06 output')
-@click.option('-o', 'OUTPUT_FEATHER', help='nanopore read id with barcode and umi; feather format')
-def main(MISMATCH_RESULT, OUTPUT_FEATHER):
+
+def barcodeAssignment(MISMATCH_RESULT, OUTPUT_FEATHER, MAX_BARCODE_ED, MAX_UMI_ED):
     mismatchResult = pd.read_feather(MISMATCH_RESULT)
 
     mismatchResult.drop_duplicates(['name','qseqid'], inplace=True)
@@ -28,14 +17,10 @@ def main(MISMATCH_RESULT, OUTPUT_FEATHER):
     mismatchResult['allHitContents'] = mismatchResult.groupby('name')['hitContent'].transform('sum')
     mismatchResult['hitCounts'] = mismatchResult.groupby('name')['hitContent'].transform('count')
 
-    mismatchResult = mismatchResult.loc[(mismatchResult['barcodeUmiMismatch'] <= 6) & \
-        (mismatchResult['barcodeMismatch'] <= 3) & \
-            (mismatchResult['umiMismatch'] <= 3)]
+    mismatchResult = mismatchResult.loc[(mismatchResult['barcodeMismatch'] <= MAX_BARCODE_ED) & \
+            (mismatchResult['umiMismatch'] <= MAX_UMI_ED)]
     mismatchResult.sort_values(['name','barcodeUmiMismatch','barcodeMismatch','umiMismatch'], inplace=True)
     mismatchResult.drop_duplicates('name', inplace=True)
     
     mismatchResult.reset_index(drop=True, inplace=True)
     mismatchResult.to_feather(OUTPUT_FEATHER)
-
-
-main()

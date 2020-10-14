@@ -1,17 +1,13 @@
-'''
-@Date: 2020-07-27 16:47:47
-LastEditors: Liuzj
-LastEditTime: 2020-09-12 10:00:21
-@Description: file content
-@Author: liuzj
-FilePath: /liuzj/scripts/pipeline/calcIrRatioNanopore/scripts/step13_getSpliceStats.py
-'''
 import pandas as pd
 import numpy as np
+import sh
 from concurrent.futures import ProcessPoolExecutor as multiP
 from loguru import logger
-from jpy_tools.otherTools import Jinterval as jI
+from .tools import Jinterval as jI
+from .tools import bedtoolsGetIntersect
+from io import StringIO
 import click
+import pickle
 
 
 def getGeneExon(line):
@@ -115,10 +111,19 @@ def getOverlapIntronAndExon(line, needOverlap):
                 if not overlapIntronsInfo:
                     overlapIntronsInfo = ''
                 else:
-                    overlapIrIntronsInfo = {x:y for x, y in overlapIntronsInfo.items() if float(y) != 0}
-                    overlapIntronsInfo = {x:y for x,y in overlapIntronsInfo.items() if x in overlapExons}
+                    overlapIrIntronsInfo = {
+                        x: y
+                        for x, y in overlapIntronsInfo.items() if float(y) != 0
+                    }
+                    overlapIntronsInfo = {
+                        x: y
+                        for x, y in overlapIntronsInfo.items()
+                        if x in overlapExons
+                    }
                     overlapIntronsInfo.update(overlapIrIntronsInfo)
-                    overlapIntronsInfo = [f'{x}:{y}' for x, y in overlapIntronsInfo.items()]
+                    overlapIntronsInfo = [
+                        f'{x}:{y}' for x, y in overlapIntronsInfo.items()
+                    ]
             break
     if needOverlap:
         return overlapExons, overlapIntrons, overlapIntronsInfo
@@ -126,14 +131,25 @@ def getOverlapIntronAndExon(line, needOverlap):
         return overlapExons, overlapIntrons
 
 
-@click.command()
-@click.option('-i', 'FILE_PATH')
-@click.option('-o', 'OUT_PATH')
-@click.option('--ratio',
-              'NEED_RATIO',
-              is_flag=True,
-              help='need retention intron overlap ratio or not')
-def main(FILE_PATH, OUT_PATH, NEED_RATIO):
+def filterResultsBasedOnGeneName(INTRON_INFO, GENE_NAME_INFO, OUT_PATH):
+    with open(GENE_NAME_INFO, 'rb') as fh:
+        geneNameInfo = pickle.load(fh)
+    intronInfo = pd.read_table(INTRON_INFO)
+    intronInfo["geneIdNonTrans"] = intronInfo["GeneId"].str.split(".").str[0]
+    intronInfo["baselineGeneId"] = intronInfo["Name"].map(
+        lambda x: geneNameInfo.get(x, {"gene_id": 0})["gene_id"])
+    intronInfo.query("geneIdNonTrans == baselineGeneId", inplace=True)
+    intronInfo.drop(["baselineGeneId", "GeneId"], axis=1, inplace=True)
+    intronInfo.rename({"geneIdNonTrans": "geneId"}, axis=1, inplace=True)
+    intronInfo.to_csv(OUT_PATH, sep="\t", index=False)
+
+
+
+def getSpliceInfo(INBAM_PATH, BED_REPRE_ANNO, GENE_NAME_INFO, OUT_PATH,
+                  NEED_RATIO, bedtoolsPath):
+    intersectResults = bedtoolsGetIntersect(INBAM_PATH, BED_REPRE_ANNO,
+                                            bedtoolsPath)
+
     NAMES = [
         "Chromosome",
         "Start",
@@ -177,7 +193,7 @@ def main(FILE_PATH, OUT_PATH, NEED_RATIO):
         "geneBlockStarts",
     ]
     logger.info('read bedtools result')
-    bedFile = pd.read_table(FILE_PATH,
+    bedFile = pd.read_table(intersectResults,
                             header=None,
                             names=NAMES,
                             usecols=USECOLS)
@@ -190,49 +206,50 @@ def main(FILE_PATH, OUT_PATH, NEED_RATIO):
         lambda x: np.fromstring(x, sep=',', dtype=int))
     bedFile['geneBlockStarts'] = bedFile['geneBlockStarts'].map(
         lambda x: np.fromstring(x, sep=',', dtype=int))
-    with open(OUT_PATH, 'w') as fh:
-        if NEED_RATIO:
-            header = f'Name\tGeneId\tStrand\tGeneExonCounts\tExonOverlapInfo\tIntronOverlapInfo\tintronOverlapRatioInfo\n'
-            fh.write(header)
-            i = 0
+    fh = StringIO()
+    if NEED_RATIO:
+        header = f'Name\tGeneId\tStrand\tGeneExonCounts\tExonOverlapInfo\tIntronOverlapInfo\tintronOverlapRatioInfo\n'
+        fh.write(header)
+        i = 0
 
-            for line in bedFile.itertuples():
-                if i % 100000 == 0:
-                    logger.info(f'{i} lines were processed, waiting')
-                i += 1
+        for line in bedFile.itertuples():
+            if i % 100000 == 0:
+                logger.info(f'{i} lines were processed, waiting')
+            i += 1
 
-                lineExonInfo, lineIntronInfo, lineIntronOverlapInfo = getOverlapIntronAndExon(
-                    line, NEED_RATIO)
-                lineExonInfo = ','.join(lineExonInfo)
-                lineIntronInfo = ','.join(lineIntronInfo)
-                lineIntronOverlapInfo = ','.join(lineIntronOverlapInfo)
-                lineStrand = line.Strand
-                lineName = line.Name
-                lineGene = line.geneName
-                lineGeneExonCounts = line.geneBlockCount
-                lineContent = f'{lineName}\t{lineGene}\t{lineStrand}\t{lineGeneExonCounts}\t{lineExonInfo}\t{lineIntronInfo}\t{lineIntronOverlapInfo}\n'
-                fh.write(lineContent)
+            lineExonInfo, lineIntronInfo, lineIntronOverlapInfo = getOverlapIntronAndExon(
+                line, NEED_RATIO)
+            lineExonInfo = ','.join(lineExonInfo)
+            lineIntronInfo = ','.join(lineIntronInfo)
+            lineIntronOverlapInfo = ','.join(lineIntronOverlapInfo)
+            lineStrand = line.Strand
+            lineName = line.Name
+            lineGene = line.geneName
+            lineGeneExonCounts = line.geneBlockCount
+            lineContent = f'{lineName}\t{lineGene}\t{lineStrand}\t{lineGeneExonCounts}\t{lineExonInfo}\t{lineIntronInfo}\t{lineIntronOverlapInfo}\n'
+            fh.write(lineContent)
 
-        else:
-            header = f'Name\tGeneId\tStrand\tGeneExonCounts\tExonOverlapInfo\tIntronOverlapInfo\n'
-            fh.write(header)
-            i = 0
+    else:
+        header = f'Name\tGeneId\tStrand\tGeneExonCounts\tExonOverlapInfo\tIntronOverlapInfo\n'
+        fh.write(header)
+        i = 0
 
-            for line in bedFile.itertuples():
-                if i % 100000 == 0:
-                    logger.info(f'{i} lines were processed, waiting')
-                i += 1
+        for line in bedFile.itertuples():
+            if i % 100000 == 0:
+                logger.info(f'{i} lines were processed, waiting')
+            i += 1
 
-                lineExonInfo, lineIntronInfo = getOverlapIntronAndExon(
-                    line, NEED_RATIO)
-                lineExonInfo = ','.join(lineExonInfo)
-                lineIntronInfo = ','.join(lineIntronInfo)
-                lineStrand = line.Strand
-                lineName = line.Name
-                lineGene = line.geneName
-                lineGeneExonCounts = line.geneBlockCount
-                lineContent = f'{lineName}\t{lineGene}\t{lineStrand}\t{lineGeneExonCounts}\t{lineExonInfo}\t{lineIntronInfo}\n'
-                fh.write(lineContent)
-
-
-main()
+            lineExonInfo, lineIntronInfo = getOverlapIntronAndExon(
+                line, NEED_RATIO)
+            lineExonInfo = ','.join(lineExonInfo)
+            lineIntronInfo = ','.join(lineIntronInfo)
+            lineStrand = line.Strand
+            lineName = line.Name
+            lineGene = line.geneName
+            lineGeneExonCounts = line.geneBlockCount
+            lineContent = f'{lineName}\t{lineGene}\t{lineStrand}\t{lineGeneExonCounts}\t{lineExonInfo}\t{lineIntronInfo}\n'
+            fh.write(lineContent)
+    logger.info(f'{i} lines were processed, waiting')
+    
+    fh.seek(0)
+    filterResultsBasedOnGeneName(fh, GENE_NAME_INFO, OUT_PATH)

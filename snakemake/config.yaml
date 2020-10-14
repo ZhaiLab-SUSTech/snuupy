@@ -1,0 +1,27 @@
+pipelineDir:
+  '/public/home/liuzj/publicPipeline/snuupy/'
+resultDir:
+  '/public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/'
+
+#genome files
+geneAnnoBed:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/gene.bed'
+genomeFa:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa'
+genomeFai:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa.fai'
+
+#softwares path
+picardPath:
+  '/public/home/liuzj/softwares/picard/picard.jar'
+
+
+# two cellranger configs
+firstRunCellRangerConfig:
+  '/public/home/liuzj/publicPipeline/snuupy/optimizedCellRanger/cellRangerParameter.yaml'
+secondRunCellRangerConfig:
+  '/public/home/liuzj/publicPipeline/snuupy/optimizedCellRanger/rerunCellRangerParameter.yaml'
+
+#reads path
+illuminaFastqs:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/illuminaFastq/'
