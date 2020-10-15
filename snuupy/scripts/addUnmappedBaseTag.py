@@ -162,3 +162,4 @@ def addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT):
                                           allFastaDict).result()
     outputProcessedRead(bamFileOut, splicedResult)
     bamFileOut.close()
+    pysam.index(BAM_PATH_OUT)

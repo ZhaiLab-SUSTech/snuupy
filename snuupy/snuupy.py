@@ -144,7 +144,7 @@ def _barcodeAssignment(MISMATCH_RESULT, OUTPUT_FEATHER, MAX_BARCODE_ED,
 @click.option("-o", "POLISHED_READ", help="polished read")
 @click.option("-p", "PENALTY_PATH", help="penalty matrix used by poa")
 @click.option("-t", "THREADS", type=int, help="threads")
-@click.option('--minimap2', 'minimapPath', default='minimap2')
+@click.option('--minimap2', 'minimapPath', show_default=True, default='minimap2')
 @click.option('--poa', 'poaPath', default='poa', show_default=True)
 @click.option('--racon', 'raconPath', default='racon', show_default=True)
 @click.option('--seqkit', 'seqkitPath', default='seqkit', show_default=True)
@@ -166,7 +166,7 @@ def _polishReads(MISMATCH_RESULT, NANOPORE_READ, TEMP_DIR, FINAL_DIR,
               'outfile',
               help='out pickle; use for calculate splicing info')
 @click.option('--out-bam', 'outBamPath', help='bam with gene id tag')
-@click.option('--bedtoolsPath',
+@click.option('--bedtools',
               'bedtoolsPath',
               default='bedtools',
               show_default=True,
@@ -263,7 +263,7 @@ def _addPolyATag(infile, genome, threads, f5dir, f5summary, bed, tempDir, fp,
 
 @main.command('polyAClusterDetected')
 @click.option('--infile', required=True, help='bam added gene tag and polyA tag')
-@click.option('--gene_bed', required=True, help='GENE BED , NOT BED 12!')
+@click.option('--gene-bed', required=True, help='GENE BED , NOT BED 12!')
 @click.option('--out-dir', 'out_suffix', required=True, help='out dir; ends with /')
 @click.option('-t', '--threads', required=False, help='threads', default=10)
 @click.option('--fasta', 'fastaPath', help='genome fa')

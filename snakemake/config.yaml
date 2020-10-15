@@ -3,17 +3,46 @@ pipelineDir:
 resultDir:
   '/public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/'
 
+#inpuf files
+rawNanoporeFa:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/nanopore.fa'
+nanoporeWorkspace:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/workspace'
+nanoporeSeqSummary:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/nanoporeSeqSummary.txt'
+
 #genome files
 geneAnnoBed:
   '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/gene.bed'
+geneAnnoRepreBed:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/araport11.representative.gene_model.bed'
+geneNot12Bed:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/geneNotBed12.bed'
 genomeFa:
   '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa'
 genomeFai:
   '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa.fai'
+usedIntron:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/select_intron_by_Cyto.id.txt'
 
 #softwares path
+minimap2Path:
+  '/public/home/liuzj/softwares/anaconda3/bin/minimap2'
 picardPath:
   '/public/home/liuzj/softwares/picard/picard.jar'
+seqkitPath:
+  '/public/home/liuzj/softwares/anaconda3/bin/seqkit'
+blastPath:
+  '/public/home/liuzj/softwares/blast/ncbi-blast-2.10.0+/bin/'
+poaPath:
+  '/public/home/liuzj/softwares/poaV2/poa'
+raconPath:
+  '/public/home/liuzj/softwares/racon/build/bin/racon'
+penaltyMatPath:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/blosum80.mat'
+bedtoolsPath:
+  '/public/home/liuzj/softwares/anaconda3/bin/bedtools'
+
 
 
 # two cellranger configs
