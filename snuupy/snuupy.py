@@ -12,6 +12,7 @@ from scripts.getSpliceInfo import getSpliceInfo
 from scripts.addPolyATag import addPolyATag
 from scripts.polyAClusterDetected import polyAClusterDetected
 from scripts.generateMtx import generateMtx
+from scripts.generateIlluminaWindowFromKb import generateIlluminaWindowFromKb
 
 
 @click.group()
@@ -60,6 +61,36 @@ def _generateIlluminaWindow(ILLUMINA_INDEX, OUT_DIR):
     output illumina reads based on mapping info
     """
     generateIlluminaWindow(ILLUMINA_INDEX, OUT_DIR)
+
+
+@main.command('generateIlluminaWindowFromKb')
+@click.option('--tg', 't2gPath')
+@click.option('--ec', 'ecPath')
+@click.option('--splice-bus', 'splicePath')
+@click.option('--unsplice-bus', 'unsplicePath')
+@click.option('--gtf', 'gtfPath')
+@click.option('-o', 'illuminaWindowDir')
+@click.option('--window', 'windowSize', type=int, default=500)
+def _generateIlluminaWindowFromKb(t2gPath, ecPath, splicePath, unsplicePath, gtfPath, illuminaWindowDir, windowSize):
+    """
+    \b
+    generate illumina windows from kb_python results(workflow: nuclei)
+    --tg: 
+        index file
+    --ec: 
+        matrix ec
+    --splice-bus: 
+        filtered spliced bus
+    --unsplice-bus: 
+        filtered spliced bus
+    --gtf: 
+        gtf anno file, used to create kb ref
+    -o:
+        dir stored illumina reads, end with '/'
+    windowSize:
+        windowSize; default 500
+    """
+    generateIlluminaWindowFromKb(t2gPath, ecPath, splicePath, unsplicePath, gtfPath, illuminaWindowDir, windowSize)
 
 
 @main.command('addUnmappedBaseTag')
@@ -281,12 +312,13 @@ def _polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads):
 @click.option('--tag','geneTag', default='gi', help='gene name tag')
 @click.option('--ir/--no-ir', 'irMode', default=True, help='generate splicing matrix or not')
 @click.option('--ir-list', 'intronList', default=False, help='only use those intron to calculate splicing matrix; if not provided, all intron will be used')
+@click.option('--only-FullLength', 'onlyFullLength', is_flag=True, help='only use full length generate splice matrix or not')
 @click.option('--out-nanopore', 'outMtxDirPath', help='matrics including nanopore expression matrix; apa matrix; splicing mtx; end with /')
 @click.option('--out-illumina', 'illuminaMtxDirPath', help='matrics including illumina expression matrix; apa matrix; splicing mtx; end with /')
-def _generateMtx(apaClusterPath, inBamPath, geneTag, inIrInfoPath, outMtxDirPath, illuminaMtxDirPath, irMode, intronList, illuminaEx):
+def _generateMtx(apaClusterPath, inBamPath, geneTag, inIrInfoPath, outMtxDirPath, illuminaMtxDirPath, irMode, intronList, illuminaEx, onlyFullLength):
     """
     generate matrices
     """
-    generateMtx(apaClusterPath, inBamPath, geneTag, inIrInfoPath, outMtxDirPath, illuminaMtxDirPath, irMode, intronList, illuminaEx)
+    generateMtx(apaClusterPath, inBamPath, geneTag, inIrInfoPath, outMtxDirPath, illuminaMtxDirPath, irMode, intronList, illuminaEx, onlyFullLength)
 
 main()

@@ -2,7 +2,7 @@
 Description: 
 Author: Liuzj
 Date: 2020-10-14 20:53:56
-LastEditTime: 2020-10-14 21:22:55
+LastEditTime: 2020-11-24 13:23:42
 LastEditors: Liuzj
 '''
 import pyranges as pr
@@ -72,7 +72,7 @@ def replaceNanoporeExpressionByIllumina(illuminaEx, nanoporeEx, nanoporeCorrectM
 
 
 
-def generateMtx(apaClusterPath, inBamPath, geneTag, inIrInfoPath, outMtxDirPath, illuminaMtxDirPath, irMode, intronList, illuminaEx):
+def generateMtx(apaClusterPath, inBamPath, geneTag, inIrInfoPath, outMtxDirPath, illuminaMtxDirPath, irMode, intronList, illuminaEx, onlyFullLength):
     """
     生成10X expression mtx 含有splice (APA) Info
 
@@ -83,6 +83,7 @@ def generateMtx(apaClusterPath, inBamPath, geneTag, inIrInfoPath, outMtxDirPath,
     -i : ./step14_getIrInfo/irInfo.tsv
     -o : 文件夹 10X表达矩阵
     --intronList : 只使用该tsv内的intron
+    --full-length
     """
     mode = []
     if (apaClusterPath != 'False') & (inBamPath  != 'False'):
@@ -124,6 +125,9 @@ def generateMtx(apaClusterPath, inBamPath, geneTag, inIrInfoPath, outMtxDirPath,
         #1 计数 不带intron
         #2 计数 带intron
         def getIntronSpliceInfo(line):
+            if onlyFullLength:
+                if line.exonOverlapCounts != line.GeneExonCounts:
+                    return 'Ambiguous'
             if (line.exonOverlapCounts == 1) and pd.isna(line.IntronOverlapInfo):
                 return 'Ambiguous'
             if not useIntronDict:

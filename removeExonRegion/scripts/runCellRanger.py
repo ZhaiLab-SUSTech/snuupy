@@ -2,7 +2,7 @@
 Description: Run CellRanger Count
 Author: Liuzj
 Date: 2020-10-12 11:08:25
-LastEditTime: 2020-10-12 20:25:33
+LastEditTime: 2020-11-27 11:59:36
 LastEditors: Liuzj
 '''
 import yaml
@@ -22,7 +22,10 @@ def parseCellRangerParameters(parameterPath):
         shNeedParasDict['cellRangerOutDir'] = parameters.pop('outDir')
         shParasList = []
         for crOption, crValue in parameters.items(): #cr cellRanger count
-            shParasList.append(f'--{crOption}={crValue}')
+            if crValue == '':
+                shParasList.append(f'--{crOption}')
+            else:
+                shParasList.append(f'--{crOption}={crValue}')
         shNeedParasDict['cellRangerParas'] = shParasList
     return shNeedParasDict
 
