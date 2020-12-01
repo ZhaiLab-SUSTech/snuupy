@@ -12,6 +12,27 @@ import sh
 import h5py
 
 
+    
+def creatAnndataFromDf(df, **layerInfoDt):
+    """
+    dataframe转换成anndata
+    df,
+    layerInfoDt:
+        key为layer名
+        value为mtx
+    均行为barcode 列为feature 维度相同
+    """
+    transformedAd = anndata.AnnData(
+        X=df.values,
+        obs=pd.DataFrame(index = df.index),
+        var=pd.DataFrame(index = df.columns)
+    )
+    for layerName, layerMtx in layerInfoDt.items():
+        transformedAd.layers[layerName] = layerMtx
+        
+    return transformedAd
+    
+
 def mkdir(dirPath):
     try:
         sh.mkdir(dirPath)
