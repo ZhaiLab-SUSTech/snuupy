@@ -45,11 +45,9 @@ bedtoolsPath:
 
 
 
-# two cellranger configs
-firstRunCellRangerConfig:
-  '/public/home/liuzj/publicPipeline/snuupy/optimizedCellRanger/cellRangerParameter.yaml'
-secondRunCellRangerConfig:
-  '/public/home/liuzj/publicPipeline/snuupy/optimizedCellRanger/rerunCellRangerParameter.yaml'
+#cellranger configs
+runCellRangerConfig:
+  '/public/home/liuzj/publicPipeline/snuupy/removeExonRegion/cellRangerParameter.yaml'
 
 #reads path
 illuminaFastqs:

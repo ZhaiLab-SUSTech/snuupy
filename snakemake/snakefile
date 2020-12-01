@@ -4,11 +4,11 @@ pipelineDir = config['pipelineDir']
 
 rule all:
     input:
-        generateMtxFinished = f"{config['resultDir']}step18_generateMtx/generateMtxFinished.empty"
+        generateMtxFinished = f"{config['resultDir']}step16_generateMtx/generateMtxFinished.empty"
 
 rule runCellRanger:
     input:
-        firstRunCellRangerConfig = config['firstRunCellRangerConfig']
+        runCellRangerConfig = config['runCellRangerConfig']
     output:
         runCellRangerFinished = f"{config['resultDir']}step1_runCellRanger/runCellRangerFinished.empty"
     params:
@@ -18,58 +18,19 @@ rule runCellRanger:
     shell:
         """
 cd {pipelineDir}
-python ./optimizedCellRanger/optimizedCellRanger.py runCellRanger -p {input.firstRunCellRangerConfig} &&touch {output.runCellRangerFinished}
-        """
-
-rule extractExonBases:
-    input:
-        runCellRangerFinished = f"{config['resultDir']}step1_runCellRanger/runCellRangerFinished.empty"
-    output:
-        extractExonBasesFinished = f"{config['resultDir']}step2_extractExonBases/extractExonBasesFinished.empty"
-    params:
-        extractExonBasesTemp = f"{config['resultDir']}step2_extractExonBases/extractExonBasesTemp/",
-        extractExonBasesFastq = f"{config['resultDir']}step2_extractExonBases/extractExonBasesFastq/",
-        picardPath = config['picardPath'],
-        geneAnnoBed = config['geneAnnoBed'],
-        illuminaFastqs = config['illuminaFastqs'],
-        extractExonBasesCutoff = 30,
-        extractExonBasesInBam = f"{config['resultDir']}step1_runCellRanger/test/outs/possorted_genome_bam.bam",
-        gpu = "0"
-
-    threads:2
-    shell:
-        """
-cd {pipelineDir}
-python ./optimizedCellRanger/optimizedCellRanger.py extractExonBases --bam {params.extractExonBasesInBam} --temp {params.extractExonBasesTemp} -t {threads} --picard {params.picardPath}     --bed {params.geneAnnoBed} --fastq {params.illuminaFastqs} --out {params.extractExonBasesFastq} --cutoff {params.extractExonBasesCutoff} &&
-touch {output.extractExonBasesFinished}
-        """
-
-rule rerunCellRanger:
-    input:
-        extractExonBasesFinished = f"{config['resultDir']}step2_extractExonBases/extractExonBasesFinished.empty",
-        secondRunCellRangerConfig = config['secondRunCellRangerConfig']
-    output:
-        rerunCellRangerFinished = f"{config['resultDir']}step3_rerunCellRanger/rerunCellRangerFinished.empty"
-    params:
-        gpu = "0"
-
-    threads:2
-    shell:
-        """
-cd {pipelineDir}
-python ./optimizedCellRanger/optimizedCellRanger.py runCellRanger -p {input.secondRunCellRangerConfig} &&touch {output.rerunCellRangerFinished}
+python ./removeExonRegion/removeExonRegion.py runCellRanger -p {input.runCellRangerConfig} &&touch {output.runCellRangerFinished}
         """
 
 rule parseIllumina:
     input:
-        rerunCellRangerFinished = f"{config['resultDir']}step3_rerunCellRanger/rerunCellRangerFinished.empty"
+        runCellRangerFinished = f"{config['resultDir']}step1_runCellRanger/runCellRangerFinished.empty"
     output:
-        parseIlluminaResults = f"{config['resultDir']}step4_parseIllumina/parseIlluminaResults.index"
+        parseIlluminaResults = f"{config['resultDir']}step2_parseIllumina/parseIlluminaResults.index"
     params:
         genomeFai = config['genomeFai'],
-        useBarcodeGz = f"{config['resultDir']}step3_rerunCellRanger/test/outs/filtered_feature_bc_matrix/barcodes.tsv.gz",
+        useBarcodeGz = f"{config['resultDir']}step1_runCellRanger/test/outs/filtered_feature_bc_matrix/barcodes.tsv.gz",
         useBarcode = f"{config['resultDir']}step3_rerunCellRanger/test/outs/filtered_feature_bc_matrix/barcodes.tsv",
-        rerunCellRangerBam = f"{config['resultDir']}step3_rerunCellRanger/test/outs/possorted_genome_bam.bam",
+        runCellRangerBam = f"{config['resultDir']}step1_runCellRanger/test/outs/possorted_genome_bam.bam",
         windowSize = 500,
         gpu = "0"
 
@@ -78,14 +39,14 @@ rule parseIllumina:
         """
 cd {pipelineDir}
 gzip -d -c {params.useBarcodeGz} > {params.useBarcode} &&
-python ./snuupy/snuupy.py parseIllumina --bam {params.rerunCellRangerBam} --barcode {params.useBarcode} --genome {params.genomeFai} --window {params.windowSize} --parsed {output.parseIlluminaResults}
+python ./snuupy/snuupy.py parseIllumina --bam {params.runCellRangerBam} --barcode {params.useBarcode} --genome {params.genomeFai} --window {params.windowSize} --parsed {output.parseIlluminaResults}
         """
 
 rule minimapMappingRaw:
     input:
         rawNanoporeFa = config['rawNanoporeFa']
     output:
-        rawMappingResult = f"{config['resultDir']}step5_minimapMappingRaw/rawMappingResult.bam"
+        rawMappingResult = f"{config['resultDir']}step3_minimapMappingRaw/rawMappingResult.bam"
     params:
         minimap2Path = config['minimap2Path'],
         genomeFa = config['genomeFa'],
@@ -101,9 +62,9 @@ cd {pipelineDir}
 
 rule addUnmappedBaseTag:
     input:
-        rawMappingResult = f"{config['resultDir']}step5_minimapMappingRaw/rawMappingResult.bam"
+        rawMappingResult = f"{config['resultDir']}step3_minimapMappingRaw/rawMappingResult.bam"
     output:
-        rawMappingResultAddUnmappedTag = f"{config['resultDir']}step6_addUnmappedBaseTag/rawMappingResultAddUnmappedTag.bam"
+        rawMappingResultAddUnmappedTag = f"{config['resultDir']}step4_addUnmappedBaseTag/rawMappingResultAddUnmappedTag.bam"
     params:
         rawNanoporeFa = config['rawNanoporeFa'],
         gpu = "0"
@@ -117,11 +78,11 @@ python ./snuupy/snuupy.py addUnmappedBaseTag -i {input.rawMappingResult} -f {par
 
 rule generateNanoporeWindow:
     input:
-        rawMappingResultAddUnmappedTag = f"{config['resultDir']}step6_addUnmappedBaseTag/rawMappingResultAddUnmappedTag.bam"
+        rawMappingResultAddUnmappedTag = f"{config['resultDir']}step4_addUnmappedBaseTag/rawMappingResultAddUnmappedTag.bam"
     output:
-        generateNanoporeWindowFinished = f"{config['resultDir']}step7_generateNanoporeWindow/generateNanoporeWindowFinished.empty"
+        generateNanoporeWindowFinished = f"{config['resultDir']}step5_generateNanoporeWindow/generateNanoporeWindowFinished.empty"
     params:
-        generateNanoporeWindow = f"{config['resultDir']}step7_generateNanoporeWindow/generateNanoporeWindow/",
+        generateNanoporeWindow = f"{config['resultDir']}step5_generateNanoporeWindow/generateNanoporeWindow/",
         genomeFai = config['genomeFai'],
         windowSize = 500,
         gpu = "0"
@@ -135,11 +96,11 @@ python ./snuupy/snuupy.py generateNanoporeWindow --genome {params.genomeFai} -b 
 
 rule generateIlluminaWindow:
     input:
-        parseIlluminaResults = f"{config['resultDir']}step4_parseIllumina/parseIlluminaResults.index"
+        parseIlluminaResults = f"{config['resultDir']}step2_parseIllumina/parseIlluminaResults.index"
     output:
-        generateIlluminaWindowFinished = f"{config['resultDir']}step8_generateIlluminaWindow/generateIlluminaWindowFinished.empty"
+        generateIlluminaWindowFinished = f"{config['resultDir']}step6_generateIlluminaWindow/generateIlluminaWindowFinished.empty"
     params:
-        generateIlluminaWindow = f"{config['resultDir']}step8_generateIlluminaWindow/generateIlluminaWindow/",
+        generateIlluminaWindow = f"{config['resultDir']}step6_generateIlluminaWindow/generateIlluminaWindow/",
         gpu = "0"
 
     threads:5
@@ -151,14 +112,14 @@ python ./snuupy/snuupy.py generateIlluminaWindow -i {input.parseIlluminaResults}
 
 rule windowBlast:
     input:
-        generateIlluminaWindowFinished = f"{config['resultDir']}step8_generateIlluminaWindow/generateIlluminaWindowFinished.empty",
-        generateNanoporeWindowFinished = f"{config['resultDir']}step7_generateNanoporeWindow/generateNanoporeWindowFinished.empty"
+        generateIlluminaWindowFinished = f"{config['resultDir']}step6_generateIlluminaWindow/generateIlluminaWindowFinished.empty",
+        generateNanoporeWindowFinished = f"{config['resultDir']}step5_generateNanoporeWindow/generateNanoporeWindowFinished.empty"
     output:
-        windowBlastFinished = f"{config['resultDir']}step9_windowBlast/windowBlastFinished.empty"
+        windowBlastFinished = f"{config['resultDir']}step7_windowBlast/windowBlastFinished.empty"
     params:
-        blastResults = f"{config['resultDir']}step9_windowBlast/blastResults/",
-        generateIlluminaWindow = f"{config['resultDir']}step8_generateIlluminaWindow/generateIlluminaWindow/",
-        generateNanoporeWindow = f"{config['resultDir']}step7_generateNanoporeWindow/generateNanoporeWindow/",
+        blastResults = f"{config['resultDir']}step7_windowBlast/blastResults/",
+        generateIlluminaWindow = f"{config['resultDir']}step6_generateIlluminaWindow/generateIlluminaWindow/",
+        generateNanoporeWindow = f"{config['resultDir']}step5_generateNanoporeWindow/generateNanoporeWindow/",
         blastPath = config['blastPath'],
         gpu = "0"
 
@@ -171,10 +132,10 @@ python ./snuupy/snuupy.py windowBlast -i {params.generateIlluminaWindow} -n {par
 
 rule getMismatch:
     input:
-        windowBlastFinished = f"{config['resultDir']}step9_windowBlast/windowBlastFinished.empty",
-        rawMappingResultAddUnmappedTag = f"{config['resultDir']}step6_addUnmappedBaseTag/rawMappingResultAddUnmappedTag.bam"
+        windowBlastFinished = f"{config['resultDir']}step7_windowBlast/windowBlastFinished.empty",
+        rawMappingResultAddUnmappedTag = f"{config['resultDir']}step4_addUnmappedBaseTag/rawMappingResultAddUnmappedTag.bam"
     output:
-        nanoporeED = f"{config['resultDir']}step10_getMismatch/nanoporeED.feather"
+        nanoporeED = f"{config['resultDir']}step8_getMismatch/nanoporeED.feather"
     params:
         windowBlastMerged = f"{config['resultDir']}step9_windowBlast/blastResults/allResult.result",
         gpu = "0"
@@ -188,9 +149,9 @@ python ./snuupy/snuupy.py getMismatch -i {params.windowBlastMerged} -b {input.ra
 
 rule barcodeAssignment:
     input:
-        nanoporeED = f"{config['resultDir']}step10_getMismatch/nanoporeED.feather"
+        nanoporeED = f"{config['resultDir']}step8_getMismatch/nanoporeED.feather"
     output:
-        nanoporeAssigned = f"{config['resultDir']}step11_barcodeAssignment/nanoporeAssigned.feather"
+        nanoporeAssigned = f"{config['resultDir']}step9_barcodeAssignment/nanoporeAssigned.feather"
     params:
         barcodeED = 3,
         umiED = 3,
@@ -205,13 +166,13 @@ python ./snuupy/snuupy.py barcodeAssignment -i {input.nanoporeED} -o {output.nan
 
 rule polishReads:
     input:
-        nanoporeAssigned = f"{config['resultDir']}step11_barcodeAssignment/nanoporeAssigned.feather",
+        nanoporeAssigned = f"{config['resultDir']}step9_barcodeAssignment/nanoporeAssigned.feather",
         rawNanoporeFa = config['rawNanoporeFa']
     output:
-        polishedReads = f"{config['resultDir']}step12_polishReads/polishedReads.fa"
+        polishedReads = f"{config['resultDir']}step10_polishReads/polishedReads.fa"
     params:
-        polishReadsTempRaw = f"{config['resultDir']}step12_polishReads/polishReadsTempRaw/",
-        polishReadsTempFinal = f"{config['resultDir']}step12_polishReads/polishReadsTempFinal/",
+        polishReadsTempRaw = f"{config['resultDir']}step10_polishReads/polishReadsTempRaw/",
+        polishReadsTempFinal = f"{config['resultDir']}step10_polishReads/polishReadsTempFinal/",
         minimap2Path = config['minimap2Path'],
         seqkitPath = config['seqkitPath'],
         poaPath = config['poaPath'],
@@ -228,9 +189,9 @@ python ./snuupy/snuupy.py polishReads -i {input.nanoporeAssigned} -f {input.rawN
 
 rule minimapMappingPolished:
     input:
-        polishedReads = f"{config['resultDir']}step12_polishReads/polishedReads.fa"
+        polishedReads = f"{config['resultDir']}step10_polishReads/polishedReads.fa"
     output:
-        polishedMappingResult = f"{config['resultDir']}step13_minimapMappingPolished/polishedMappingResult.bam"
+        polishedMappingResult = f"{config['resultDir']}step11_minimapMappingPolished/polishedMappingResult.bam"
     params:
         minimap2Path = config['minimap2Path'],
         genomeFa = config['genomeFa'],
@@ -246,10 +207,10 @@ cd {pipelineDir}
 
 rule addGeneName:
     input:
-        polishedMappingResult = f"{config['resultDir']}step13_minimapMappingPolished/polishedMappingResult.bam"
+        polishedMappingResult = f"{config['resultDir']}step11_minimapMappingPolished/polishedMappingResult.bam"
     output:
-        polishedReadsAddGNPickle = f"{config['resultDir']}step14_addGeneName/polishedReadsAddGNPickle.pickle",
-        polishedReadsAddGNBam = f"{config['resultDir']}step14_addGeneName/polishedReadsAddGNBam.bam"
+        polishedReadsAddGNPickle = f"{config['resultDir']}step12_addGeneName/polishedReadsAddGNPickle.pickle",
+        polishedReadsAddGNBam = f"{config['resultDir']}step12_addGeneName/polishedReadsAddGNBam.bam"
     params:
         geneAnnoBed = config['geneAnnoBed'],
         bedtoolsPath = config['bedtoolsPath'],
@@ -264,10 +225,10 @@ python ./snuupy/snuupy.py addGeneName -i {input.polishedMappingResult} --bed {pa
 
 rule getSpliceInfo:
     input:
-        polishedMappingResult = f"{config['resultDir']}step13_minimapMappingPolished/polishedMappingResult.bam",
-        polishedReadsAddGNPickle = f"{config['resultDir']}step14_addGeneName/polishedReadsAddGNPickle.pickle"
+        polishedMappingResult = f"{config['resultDir']}step11_minimapMappingPolished/polishedMappingResult.bam",
+        polishedReadsAddGNPickle = f"{config['resultDir']}step12_addGeneName/polishedReadsAddGNPickle.pickle"
     output:
-        splicingInfo = f"{config['resultDir']}step15_getSpliceInfo/splicingInfo.tsv"
+        splicingInfo = f"{config['resultDir']}step13_getSpliceInfo/splicingInfo.tsv"
     params:
         bedtoolsPath = config['bedtoolsPath'],
         geneAnnoRepreBed = config['geneAnnoRepreBed'],
@@ -282,16 +243,16 @@ python ./snuupy/snuupy.py getSpliceInfo -i {input.polishedMappingResult} -b {par
 
 rule addPolyATag:
     input:
-        nanoporeAssigned = f"{config['resultDir']}step11_barcodeAssignment/nanoporeAssigned.feather",
-        polishedReadsAddGNBam = f"{config['resultDir']}step14_addGeneName/polishedReadsAddGNBam.bam",
+        nanoporeAssigned = f"{config['resultDir']}step9_barcodeAssignment/nanoporeAssigned.feather",
+        polishedReadsAddGNBam = f"{config['resultDir']}step12_addGeneName/polishedReadsAddGNBam.bam",
         rawNanoporeFa = config['rawNanoporeFa'],
         nanoporeWorkspace = config['nanoporeWorkspace'],
         nanoporeSeqSummary = config['nanoporeSeqSummary'],
         geneAnnoBed = config['geneAnnoBed']
     output:
-        polishedReadsAddGNPABam = f"{config['resultDir']}step16_addPolyATag/polishedReadsAddGNPABam.bam"
+        polishedReadsAddGNPABam = f"{config['resultDir']}step14_addPolyATag/polishedReadsAddGNPABam.bam"
     params:
-        polyACallerTemp = f"{config['resultDir']}step16_addPolyATag/polyACallerTemp/",
+        polyACallerTemp = f"{config['resultDir']}step14_addPolyATag/polyACallerTemp/",
         genomeFa = config['genomeFa'],
         geneAnnoBed = config['geneAnnoBed'],
         minimap2Path = config['minimap2Path'],
@@ -306,11 +267,11 @@ python ./snuupy/snuupy.py addPolyATag --in-fasta {input.rawNanoporeFa} --genome 
 
 rule polyAClusterDetected:
     input:
-        polishedReadsAddGNPABam = f"{config['resultDir']}step16_addPolyATag/polishedReadsAddGNPABam.bam"
+        polishedReadsAddGNPABam = f"{config['resultDir']}step14_addPolyATag/polishedReadsAddGNPABam.bam"
     output:
-        polyAClusterDetectedFinished = f"{config['resultDir']}step17_polyAClusterDetected/polyAClusterDetectedFinished.empty"
+        polyAClusterDetectedFinished = f"{config['resultDir']}step15_polyAClusterDetected/polyAClusterDetectedFinished.empty"
     params:
-        polyACluster = f"{config['resultDir']}step17_polyAClusterDetected/polyACluster/",
+        polyACluster = f"{config['resultDir']}step15_polyAClusterDetected/polyACluster/",
         geneNot12Bed = config['geneNot12Bed'],
         genomeFa = config['genomeFa'],
         gpu = "0"
@@ -324,14 +285,14 @@ python ./snuupy/snuupy.py polyAClusterDetected --infile {input.polishedReadsAddG
 
 rule generateMtx:
     input:
-        splicingInfo = f"{config['resultDir']}step15_getSpliceInfo/splicingInfo.tsv",
-        polishedReadsAddGNPABam = f"{config['resultDir']}step16_addPolyATag/polishedReadsAddGNPABam.bam",
-        polyAClusterDetectedFinished = f"{config['resultDir']}step17_polyAClusterDetected/polyAClusterDetectedFinished.empty"
+        splicingInfo = f"{config['resultDir']}step13_getSpliceInfo/splicingInfo.tsv",
+        polishedReadsAddGNPABam = f"{config['resultDir']}step14_addPolyATag/polishedReadsAddGNPABam.bam",
+        polyAClusterDetectedFinished = f"{config['resultDir']}step15_polyAClusterDetected/polyAClusterDetectedFinished.empty"
     output:
-        generateMtxFinished = f"{config['resultDir']}step18_generateMtx/generateMtxFinished.empty"
+        generateMtxFinished = f"{config['resultDir']}step16_generateMtx/generateMtxFinished.empty"
     params:
-        IlluminaMultiMat = f"{config['resultDir']}step18_generateMtx/IlluminaMultiMat/",
-        NanoporeMultiMat = f"{config['resultDir']}step18_generateMtx/NanoporeMultiMat/",
+        IlluminaMultiMat = f"{config['resultDir']}step16_generateMtx/IlluminaMultiMat/",
+        NanoporeMultiMat = f"{config['resultDir']}step16_generateMtx/NanoporeMultiMat/",
         usedIntron = config['usedIntron'],
         illuminaExpressionMtx = f"{config['resultDir']}step3_rerunCellRanger/test/outs/filtered_feature_bc_matrix.h5",
         apaCluster = f"{config['resultDir']}step17_polyAClusterDetected/polyACluster/polya_cluster.filtered.bed",
