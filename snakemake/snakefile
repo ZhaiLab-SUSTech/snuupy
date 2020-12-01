@@ -137,7 +137,7 @@ rule getMismatch:
     output:
         nanoporeED = f"{config['resultDir']}step8_getMismatch/nanoporeED.feather"
     params:
-        windowBlastMerged = f"{config['resultDir']}step9_windowBlast/blastResults/allResult.result",
+        windowBlastMerged = f"{config['resultDir']}step7_windowBlast/blastResults/allResult.result",
         gpu = "0"
 
     threads:2
@@ -294,8 +294,8 @@ rule generateMtx:
         IlluminaMultiMat = f"{config['resultDir']}step16_generateMtx/IlluminaMultiMat/",
         NanoporeMultiMat = f"{config['resultDir']}step16_generateMtx/NanoporeMultiMat/",
         usedIntron = config['usedIntron'],
-        illuminaExpressionMtx = f"{config['resultDir']}step3_rerunCellRanger/test/outs/filtered_feature_bc_matrix.h5",
-        apaCluster = f"{config['resultDir']}step17_polyAClusterDetected/polyACluster/polya_cluster.filtered.bed",
+        illuminaExpressionMtx = f"{config['resultDir']}step1_runCellRanger/test/outs/filtered_feature_bc_matrix.h5",
+        apaCluster = f"{config['resultDir']}step15_polyAClusterDetected/polyACluster/polya_cluster.filtered.bed",
         gpu = "0"
 
     threads:1

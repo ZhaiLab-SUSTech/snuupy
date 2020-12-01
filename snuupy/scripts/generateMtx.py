@@ -63,7 +63,7 @@ def replaceNanoporeExpressionByIllumina(illuminaEx, nanoporeEx, nanoporeCorrectM
     nanoAdata = sc.read_10x_mtx(nanoporeEx)
     illuEx = illuAdata.to_df()
     nanoEx = nanoAdata.to_df()
-    nanoEx = nanoEx.loc[:,nanoEx.columns.str.find('_') != [-1]]
+    nanoEx = nanoEx.loc[:,nanoEx.columns.str.find('_') != -1]
     nanoEx = nanoEx.join(illuEx, how='right')
     nanoEx.fillna(0, inplace=True)
     nanoEx.index = nanoEx.index.str.split('-').str[0]

@@ -309,7 +309,7 @@ def _polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads):
 @click.option('--in-illumina', 'illuminaEx', help='cell ranger count output <filtered_feature_bc_matrix.h5>')
 @click.option('--apa-pac', 'apaClusterPath' , default='False', help='polyAClusterDetected output; the filtered bed were recommended; if not provided the APA matrix will not be generated')
 @click.option('--apa-bam', 'inBamPath', default='False', help='the nanopore bam added gene name tag; if not provided the APA matrix will not be generated')
-@click.option('--tag','geneTag', default='gi', help='gene name tag')
+@click.option('--tag','geneTag', default='gi', help='gene name tag', show_default=True)
 @click.option('--ir/--no-ir', 'irMode', default=True, help='generate splicing matrix or not')
 @click.option('--ir-list', 'intronList', default=False, help='only use those intron to calculate splicing matrix; if not provided, all intron will be used')
 @click.option('--only-FullLength', 'onlyFullLength', is_flag=True, help='only use full length generate splice matrix or not')
