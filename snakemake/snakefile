@@ -29,7 +29,7 @@ rule parseIllumina:
     params:
         genomeFai = config['genomeFai'],
         useBarcodeGz = f"{config['resultDir']}step1_runCellRanger/test/outs/filtered_feature_bc_matrix/barcodes.tsv.gz",
-        useBarcode = f"{config['resultDir']}step3_rerunCellRanger/test/outs/filtered_feature_bc_matrix/barcodes.tsv",
+        useBarcode = f"{config['resultDir']}step1_runCellRanger/test/outs/filtered_feature_bc_matrix/barcodes.tsv",
         runCellRangerBam = f"{config['resultDir']}step1_runCellRanger/test/outs/possorted_genome_bam.bam",
         windowSize = 500,
         gpu = "0"

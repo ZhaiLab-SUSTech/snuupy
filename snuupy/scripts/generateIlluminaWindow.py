@@ -36,5 +36,5 @@ def generateIlluminaWindow(ILLUMINA_INDEX, OUT_DIR):
         os.system(f'mkdir {currentChr}')
         for singleWindow in parsedIndex[chr_].keys():
             currentWindowPath = currentChr + singleWindow + '/'
-            windowBarcodes = parsedIndex[f'{chr_}/{singleWindow}'].value.astype(str)
+            windowBarcodes = parsedIndex[f'{chr_}/{singleWindow}'][()].astype(str)
             generateOneWindow(currentWindowPath, windowBarcodes)
