@@ -281,15 +281,20 @@ def _getSpliceInfo(INBAM_PATH, BED_REPRE_ANNO, GENE_NAME_INFO, OUT_PATH,
               default='minimap2',
               show_default=True,
               help='minimap2 path')
+@click.option('--samtools',
+              'samtoolsPath',
+              default='samtools',
+              show_default=True,
+              help='samtools path')
 def _addPolyATag(infile, genome, threads, f5dir, f5summary, bed, tempDir, fp,
                  ep, featherPath, bamFilePath, addPolyAFilePath, polyATag,
-                 minimapPath):
+                 minimapPath, samtoolsPath):
     """
     add polyA length tag for bam files
     """
     addPolyATag(infile, genome, threads, f5dir, f5summary, bed, tempDir, fp,
                 ep, featherPath, bamFilePath, addPolyAFilePath, polyATag,
-                minimapPath)
+                minimapPath, samtoolsPath)
 
 
 @main.command('polyAClusterDetected')

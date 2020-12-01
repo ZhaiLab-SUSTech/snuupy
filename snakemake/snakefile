@@ -14,7 +14,7 @@ rule runCellRanger:
     params:
         gpu = "0"
 
-    threads:2
+    threads:56
     shell:
         """
 cd {pipelineDir}
@@ -53,7 +53,7 @@ rule minimapMappingRaw:
         geneAnnoBed = config['geneAnnoBed'],
         gpu = "0"
 
-    threads:2
+    threads:56
     shell:
         """
 cd {pipelineDir}
@@ -69,7 +69,7 @@ rule addUnmappedBaseTag:
         rawNanoporeFa = config['rawNanoporeFa'],
         gpu = "0"
 
-    threads:1
+    threads:2
     shell:
         """
 cd {pipelineDir}
@@ -87,7 +87,7 @@ rule generateNanoporeWindow:
         windowSize = 500,
         gpu = "0"
 
-    threads:5
+    threads:2
     shell:
         """
 cd {pipelineDir}
@@ -103,7 +103,7 @@ rule generateIlluminaWindow:
         generateIlluminaWindow = f"{config['resultDir']}step6_generateIlluminaWindow/generateIlluminaWindow/",
         gpu = "0"
 
-    threads:5
+    threads:2
     shell:
         """
 cd {pipelineDir}
@@ -123,7 +123,7 @@ rule windowBlast:
         blastPath = config['blastPath'],
         gpu = "0"
 
-    threads:2
+    threads:56
     shell:
         """
 cd {pipelineDir}
@@ -140,7 +140,7 @@ rule getMismatch:
         windowBlastMerged = f"{config['resultDir']}step7_windowBlast/blastResults/allResult.result",
         gpu = "0"
 
-    threads:2
+    threads:56
     shell:
         """
 cd {pipelineDir}
@@ -180,7 +180,7 @@ rule polishReads:
         penaltyMatPath = config['penaltyMatPath'],
         gpu = "0"
 
-    threads:2
+    threads:56
     shell:
         """
 cd {pipelineDir}
@@ -198,7 +198,7 @@ rule minimapMappingPolished:
         geneAnnoBed = config['geneAnnoBed'],
         gpu = "0"
 
-    threads:2
+    threads:56
     shell:
         """
 cd {pipelineDir}
@@ -216,7 +216,7 @@ rule addGeneName:
         bedtoolsPath = config['bedtoolsPath'],
         gpu = "0"
 
-    threads:1
+    threads:2
     shell:
         """
 cd {pipelineDir}
@@ -234,7 +234,7 @@ rule getSpliceInfo:
         geneAnnoRepreBed = config['geneAnnoRepreBed'],
         gpu = "0"
 
-    threads:1
+    threads:2
     shell:
         """
 cd {pipelineDir}
@@ -258,7 +258,7 @@ rule addPolyATag:
         minimap2Path = config['minimap2Path'],
         gpu = "0"
 
-    threads:2
+    threads:56
     shell:
         """
 cd {pipelineDir}
@@ -276,7 +276,7 @@ rule polyAClusterDetected:
         genomeFa = config['genomeFa'],
         gpu = "0"
 
-    threads:2
+    threads:56
     shell:
         """
 cd {pipelineDir}
@@ -298,7 +298,7 @@ rule generateMtx:
         apaCluster = f"{config['resultDir']}step15_polyAClusterDetected/polyACluster/polya_cluster.filtered.bed",
         gpu = "0"
 
-    threads:1
+    threads:2
     shell:
         """
 cd {pipelineDir}
