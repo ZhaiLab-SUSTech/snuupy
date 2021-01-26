@@ -1,0 +1,16 @@
+cellRangerPath:
+  'cellranger5'
+outDir:
+  '/public/home/liuzj/projects/singleCellEndosperm/01_results/cellRanger/step1_runCellRanger/'
+id:
+  'test'
+fastqs:
+  '/public/home/liuzj/projects/singleCellEndosperm/00_data/rawIlluminaData/'
+transcriptome:
+  '/public/home/liuzj/data/singleCellRef/araport11/cellRangerRef/'
+localcores:
+  56
+r1-length:
+  26
+include-introns:
+  '' # means use inclued-introns mode

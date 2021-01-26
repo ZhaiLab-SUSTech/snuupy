@@ -1,0 +1,54 @@
+pipelineDir:
+  '/public/home/liuzj/publicPipeline/snuupy/'
+resultDir:
+  '/public/home/liuzj/projects/singleCellRoot/01_results/cellRanger/'
+
+#input files
+rawNanoporeFa:
+  '/public/home/liuzj/projects/singleCellRoot/00_data/rawNanoporeData/allRoot.fasta'
+nanoporeWorkspace:
+  '/public/home/liuzj/projects/singleCellRoot/00_data/rawNanoporeData/workspace/'
+nanoporeSeqSummary:
+  '/public/home/liuzj/projects/singleCellRoot/00_data/rawNanoporeData/sequencing_summary.txt'
+
+#genome files
+geneAnnoBed:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/gene.bed'
+geneAnnoRepreBed:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/araport11.representative.gene_model.bed'
+geneNot12Bed:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/geneNotBed12.bed'
+genomeFa:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa'
+genomeFai:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa.fai'
+usedIntron:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/select_intron_by_Cyto.id.txts' #could be obtained in Jia et al., Nature Plant, 2020
+
+#softwares path
+minimap2Path:
+  '/public/home/liuzj/softwares/anaconda3/bin/minimap2'
+picardPath:
+  '/public/home/liuzj/softwares/picard/picard.jar'
+seqkitPath:
+  '/public/home/liuzj/softwares/anaconda3/bin/seqkit'
+blastPath:
+  '/public/home/liuzj/softwares/blast/ncbi-blast-2.10.0+/bin/'
+poaPath:
+  '/public/home/liuzj/softwares/poaV2/poa'
+raconPath:
+  '/public/home/liuzj/softwares/racon/build/bin/racon'
+penaltyMatPath:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/blosum80.mat'
+bedtoolsPath:
+  '/public/home/liuzj/softwares/anaconda3/bin/bedtools'
+
+
+
+#cellranger configs
+runCellRangerConfig:
+  '/public/home/liuzj/projects/singleCellRoot/01_results/cellRanger/cellRangerParameter.yaml'
+
+#reads path
+illuminaFastqs:
+  '/public/home/liuzj/projects/singleCellRoot/00_data/rawIlluminaData/'

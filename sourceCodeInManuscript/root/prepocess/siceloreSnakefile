@@ -1,0 +1,193 @@
+configfile: "/public/home/liuzj/projects/singleCell/01_pipeline/pipeline_sicelore/snakemake/config.yaml"
+pipelineDir = config['pipelineDir']
+
+
+rule all:
+    input:
+        generateExpressionMatrixfinished = f"{config['resultDir']}step11_generateExpressionMatrix/generateExpressionMatrixfinished.empty"
+
+rule parseIlluminaBam:
+    input:
+        barcodeFile = config['barcodeFile'],
+        cellrangerBamFile = config['cellrangerBamFile']
+    output:
+        illuminaIndex = f"{config['resultDir']}step1_parseIlluminaBam/illuminaIndex.index"
+    params:
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+java -jar Jar/IlluminaParser-1.0.jar -i {input.cellrangerBamFile} -o {output.illuminaIndex} -t {input.barcodeFile} -b CB -g GN -u UB
+        """
+
+rule scanNanoporeReads:
+    input:
+        nanoporeRead = config['nanoporeRead']
+    output:
+        allFWD = f"{config['resultDir']}step2_scanNanoporeReads/scanNanoporeReads/passed/allFWD.fastq"
+    params:
+        scanNanoporeReads = f"{config['resultDir']}step2_scanNanoporeReads/scanNanoporeReads/",
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+java -jar Jar/NanoporeReadScanner-0.5.jar -i {input.nanoporeRead} -o {params.scanNanoporeReads}
+        """
+
+rule mapReadsToGenome:
+    input:
+        geneBed = config['geneBed'],
+        genomeFasta = config['genomeFasta'],
+        allFWD = f"{config['resultDir']}step2_scanNanoporeReads/scanNanoporeReads/passed/allFWD.fastq"
+    output:
+        filtedReads = f"{config['resultDir']}step3_mapReadsToGenome/filtedReads.bam"
+    params:
+        filtedReadsSam = f"{config['resultDir']}step3_mapReadsToGenome/filtedReadsSam.sam",
+        filtedReadsUnsorted = f"{config['resultDir']}step3_mapReadsToGenome/filtedReadsUnsorted.bam",
+        gpu = "0"
+
+    threads:32
+    shell:
+        """
+cd {pipelineDir}
+minimap2 -ax splice -uf --MD --sam-hit-only -t 32 --junc-bed {input.geneBed} {input.genomeFasta} {input.allFWD} > {params.filtedReadsSam} &&samtools view -Sb {params.filtedReadsSam} -o {params.filtedReadsUnsorted} &&samtools sort {params.filtedReadsUnsorted} -o {output.filtedReads} &&samtools index {output.filtedReads}
+        """
+
+rule tagReadsWithGeneName:
+    input:
+        refFlat = config['refFlat'],
+        filtedReads = f"{config['resultDir']}step3_mapReadsToGenome/filtedReads.bam"
+    output:
+        addGeneName = f"{config['resultDir']}step4_tagReadsWithGeneName/addGeneName.bam"
+    params:
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+java -jar -Xmx64g Jar/Sicelore-1.0.jar AddGeneNameTag I={input.filtedReads} O={output.addGeneName} REFFLAT={input.refFlat} GENETAG=GE ALLOW_MULTI_GENE_READS=true USE_STRAND_INFO=true VALIDATION_STRINGENCY=SILENT &&samtools index {output.addGeneName}
+        """
+
+rule tagReadsWithSeq:
+    input:
+        addGeneName = f"{config['resultDir']}step4_tagReadsWithGeneName/addGeneName.bam",
+        allFWD = f"{config['resultDir']}step2_scanNanoporeReads/scanNanoporeReads/passed/allFWD.fastq"
+    output:
+        addSeq = f"{config['resultDir']}step5_tagReadsWithSeq/addSeq.bam"
+    params:
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+java -jar -Xmx64g Jar/Sicelore-1.0.jar AddBamReadSequenceTag I={input.addGeneName} O={output.addSeq} FASTQ={input.allFWD} VALIDATION_STRINGENCY=SILENT &&samtools index {output.addSeq}
+        """
+
+rule tagBarcodeUmi:
+    input:
+        addSeq = f"{config['resultDir']}step5_tagReadsWithSeq/addSeq.bam",
+        illuminaIndex = f"{config['resultDir']}step1_parseIlluminaBam/illuminaIndex.index"
+    output:
+        addBarcodeUmi = f"{config['resultDir']}step6_tagBarcodeUmi/addBarcodeUmi.bam",
+        addBarcodeUmi_umifound_ = f"{config['resultDir']}step6_tagBarcodeUmi/addBarcodeUmi_umifound_.bam",
+        addBarcodeUmiLog = f"{config['resultDir']}step6_tagBarcodeUmi/addBarcodeUmiLog.log"
+    params:
+        gpu = "0"
+
+    threads:32
+    shell:
+        """
+cd {pipelineDir}
+java -jar -Xmx64g Jar/NanoporeBC_UMI_finder-1.0.jar -i {input.addSeq} -o {output.addBarcodeUmi} -k {input.illuminaIndex} --ncpu {threads} -b 3 -u 3 --logFile {output.addBarcodeUmiLog}
+        """
+
+rule tagMolBc:
+    input:
+        molMappingResult = f"{config['resultDir']}step9_tagMolBc/molMappingResult.bam"
+    output:
+        molMappingResultBc = f"{config['resultDir']}step9_tagMolBc/molMappingResultBc.bam"
+    params:
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+java -jar -Xmx20g Jar/Sicelore-1.0.jar AddBamMoleculeTags I={input.molMappingResult} O={output.molMappingResultBc} &&samtools index {output.molMappingResultBc}
+        """
+
+rule tagMolGeneName:
+    input:
+        molMappingResultBc = f"{config['resultDir']}step9_tagMolBc/molMappingResultBc.bam",
+        refFlat = config['refFlat']
+    output:
+        molMappingResultBcFinal = f"{config['resultDir']}step10_tagMolGeneName/molMappingResultBcFinal.bam"
+    params:
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+java -jar -Xmx20g Jar/Sicelore-1.0.jar AddGeneNameTag I={input.molMappingResultBc} O={output.molMappingResultBcFinal} REFFLAT={input.refFlat} GENETAG=GE ALLOW_MULTI_GENE_READS=true USE_STRAND_INFO=true VALIDATION_STRINGENCY=SILENT &&samtools index {output.molMappingResultBcFinal}
+        """
+
+rule generateExpressionMatrix:
+    input:
+        molMappingResultBcFinal = f"{config['resultDir']}step10_tagMolGeneName/molMappingResultBcFinal.bam",
+        refFlat = config['refFlat'],
+        barcodeFile = config['barcodeFile']
+    output:
+        generateExpressionMatrixfinished = f"{config['resultDir']}step11_generateExpressionMatrix/generateExpressionMatrixfinished.empty"
+    params:
+        expressionMatrixDir = f"{config['resultDir']}step11_generateExpressionMatrix/expressionMatrixDir/",
+        gpu = "0"
+
+    threads:1
+    shell:
+        """
+cd {pipelineDir}
+mkdir {params.expressionMatrixDir} &&java -jar -Xmx20g Jar/Sicelore-1.0.jar IsoformMatrix DELTA=2 METHOD=STRICT ISOBAM=true GENETAG=GE I={input.molMappingResultBcFinal} REFFLAT={input.refFlat} CSV={input.barcodeFile} OUTDIR={params.expressionMatrixDir} PREFIX=sicmol VALIDATION_STRINGENCY=SILENT && touch {output.generateExpressionMatrixfinished}
+        """
+
+rule computeConsensusSeq:
+    input:
+        addBarcodeUmi_umifound_ = f"{config['resultDir']}step6_tagBarcodeUmi/addBarcodeUmi_umifound_.bam"
+    output:
+        allConsensus = f"{config['resultDir']}step7_computeConsensusSeq/allConsensus.fa"
+    params:
+        computeConsunsusTemp = f"{config['resultDir']}step7_computeConsensusSeq/computeConsunsusTemp/",
+        gpu = "0"
+
+    threads:64
+    shell:
+        """
+cd {pipelineDir}
+mkdir {params.computeConsunsusTemp} &&java -jar -Xmx80g Jar/Sicelore-1.0.jar ComputeConsensus T={threads} I={input.addBarcodeUmi_umifound_} O={output.allConsensus} TMPDIR={params.computeConsunsusTemp}
+        """
+
+rule mapMolToGenome:
+    input:
+        genomeFasta = config['genomeFasta'],
+        geneBed = config['geneBed'],
+        allConsensus = f"{config['resultDir']}step7_computeConsensusSeq/allConsensus.fa"
+    output:
+        molMappingResult = f"{config['resultDir']}step9_tagMolBc/molMappingResult.bam"
+    params:
+        molMappingResultUnsorted = f"{config['resultDir']}step8_mapMolToGenome/molMappingResultUnsorted.bam",
+        molMappingResultSam = f"{config['resultDir']}step8_mapMolToGenome/molMappingResultSam.sam",
+        gpu = "0"
+
+    threads:64
+    shell:
+        """
+cd {pipelineDir}
+minimap2 -ax splice --secondary=no -uf --MD --sam-hit-only -t {threads} --junc-bed {input.geneBed} {input.genomeFasta} {input.allConsensus}> {params.molMappingResultSam} && samtools view -Sb {params.molMappingResultSam} -o {params.molMappingResultUnsorted} && samtools sort {params.molMappingResultUnsorted} -o {output.molMappingResult} && samtools index {output.molMappingResult}
+        """
+

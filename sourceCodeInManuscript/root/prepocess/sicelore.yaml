@@ -1,0 +1,16 @@
+pipelineDir:
+  '/public/home/liuzj/projects/singleCell/01_pipeline/pipeline_sicelore/scripts/'
+resultDir:
+  '/public/home/liuzj/projects/singleCellRoot/01_results/runSicelore/'
+barcodeFile:
+  '/public/home/liuzj/projects/singleCellRoot/01_results/step3_rerunCellRanger/rerunCellRangerDir/cellranger/outs/filtered_feature_bc_matrix/barcodes.tsv'
+cellrangerBamFile:
+  '/public/home/liuzj/projects/singleCellRoot/01_results/step3_rerunCellRanger/rerunCellRangerDir/cellranger/outs/possorted_genome_bam.bam'
+geneBed:
+  '/public/home/liuzj/data/Araport11/gene.bed'
+genomeFasta:
+  '/public/home/liuzj/data/Araport11/genome.fa'
+nanoporeRead:
+  '/public/home/liuzj/projects/singleCellRoot/00_data/01_rootUseData/01_basecalledData/00_basecalledData/all/all.fastq'
+refFlat:
+  '/public/home/liuzj/data/Araport11/gene.refFlat'
