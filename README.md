@@ -8,7 +8,7 @@ single-nucleus utility in python
 
 Git clone or download this repository then modify the paths in the configuration file before running snakemake. 
 
-# Usage
+# usage
 
 snuupy.py [OPTIONS] COMMAND [ARGS]
 
