@@ -32,7 +32,23 @@ Commands:
 
 
 # packages required
-Snakemake python3.7 pandas scipy numpy scanpy joblib loguru minimap2 poaV2 seqkit racon biopython picard portaion ont-fast5-api more_itertools
+- Snakemake 
+- python3 
+- pandas 
+- scipy 
+- numpy 
+- scanpy 
+- joblib 
+- loguru 
+- minimap2 
+- poaV2 
+- seqkit 
+- racon 
+- biopython 
+- picard 
+- portaion 
+- ont-fast5-api 
+- more_itertools
 
 # acknowledge
 This pipeline was inspired by Sicelore
