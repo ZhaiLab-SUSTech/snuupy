@@ -13,3 +13,6 @@ Snakemake python3.7 pandas scipy numpy scanpy joblib loguru minimap2 poaV2 seqki
 
 # acknowledge
 This pipeline was inspired by Sicelore
+
+# open source license
+The source code is released under MIT license. 
