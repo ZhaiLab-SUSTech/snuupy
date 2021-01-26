@@ -6,7 +6,30 @@ single-nucleus utility in python
 # tutorial
 ![Schematic_diagram](./Schematic_diagram.png)
 
-copy this project and correct yaml files path then run the snakefile
+Git clone or download this repository then modify the paths in the configuration file before running snakemake. 
+
+# Usage
+
+snuupy.py [OPTIONS] COMMAND [ARGS]
+
+Commands:
+
+  - addGeneName
+  - addPolyATag
+  - addUnmappedBaseTag
+  - barcodeAssignment
+  - generateH5adFromKb
+  - generateIlluminaWindow
+  - generateIlluminaWindowFromKb
+  - generateMtx
+  - generateNanoporeWindow
+  - getMismatch
+  - getSpliceInfo
+  - parseIllumina
+  - polishReads
+  - polyAClusterDetected
+  - windowBlast
+
 
 # packages required
 Snakemake python3.7 pandas scipy numpy scanpy joblib loguru minimap2 poaV2 seqkit racon biopython picard portaion ont-fast5-api more_itertools
