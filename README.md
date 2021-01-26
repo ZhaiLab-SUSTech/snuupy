@@ -1,4 +1,5 @@
 # snuupy
+[![DOI](https://zenodo.org/badge/302899070.svg)](https://zenodo.org/badge/latestdoi/302899070)
 single-nucleus utility in python
 
 # tutorial
