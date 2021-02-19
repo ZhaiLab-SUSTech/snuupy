@@ -2,19 +2,18 @@
 Description: 
 Author: Liuzj
 Date: 2020-10-13 11:56:51
-LastEditTime: 2020-10-13 15:52:30
-LastEditors: Liuzj
+LastEditTime: 2021-02-19 10:04:30
+LastEditors: liuzj
 '''
 import os
 import pysam
-import click
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 
-def getGenomeUpper(genomeIndexPath, window, i=5):
+def getGenomeUpper(genomeIndexPath, window, i):
     """
-    获得染色体的长度
-    i 为仅使用i条
+    get the length up chromosome
+    i: only use <i> chromosome(s)
     """
     genomeIndex = pd.read_table(genomeIndexPath, header=None)
     genomeIndex = genomeIndex.iloc[:i, 0:2]
@@ -53,6 +52,15 @@ def parseOneChr(bamChrFetch, window, upperLimit, outputPath):
 
 
 def generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, useColumn):
+    """
+    output nanopore reads based on mapping info
+
+    GENOME_INDEX: the fai format file.
+    useColumn: chromosome counts, should same as <parseIllumina>.
+    BAM_PATH: bam added unmapped base tag ; format bam.
+    OUT_PAT: output dir; end with /
+    WINDOW: window size, same as <parseIllumina>
+    """
     os.system(f'samtools index {BAM_PATH}')
     genomeUpper = getGenomeUpper(GENOME_INDEX, WINDOW, useColumn)
     with ThreadPoolExecutor(5) as multiT:

@@ -110,6 +110,8 @@ def generateMtx(
     if irMode:
         mode.append("ir")
         logger.warning("ir mode")
+        if onlyFullLength:
+            logger.warning("Only FullLength Mode")
     if not mode:
         logger.warning("expression only mode")
 

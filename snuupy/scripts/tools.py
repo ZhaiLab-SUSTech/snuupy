@@ -67,9 +67,9 @@ class sequence:
 
 def readFasta(path):
     '''
-    @description: 读fasta
-    @param {type} fasta路径
-    @return: 一个迭代器
+    @description: read fasta
+    @param {type} fasta file path
+    @return: read generator
     '''
     FastaRead = namedtuple('FastaRead', ['name', 'seq'])
 
@@ -321,7 +321,7 @@ def transformExpressionMatrixTo10XMtx(inputPath, outputDir):
             expressionMtx['barcode']), len(expressionMtx)
     with open(f"{outputDir}matrix.mtx", "w") as fh:
         fh.write(
-            f'%%MatrixMarket matrix coordinate integer general\n%metadata_json: {{"format_version": 2, "software_version": "3.1.0"}}\n{featureCounts} {barcodeCounts} {rowCounts}'
+            f'%%MatrixMarket matrix coordinate integer general\n%metadata_json: {{"format_version": 2, "software_version": "X.X.0"}}\n{featureCounts} {barcodeCounts} {rowCounts}'
         )
         for line in expressionMtx.itertuples():
             fh.write(f'\n{line.feature} {line.barcode} {line.count}')
