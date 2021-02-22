@@ -142,15 +142,18 @@ def outputProcessedRead(bamFileOut, processedReadList):
         bamFileOut.write(read)
 
 
-def addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT):
+def addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK):
     global bamFile
     bamFile = pysam.AlignmentFile(BAM_PATH, "rb")
     bamFileOut = pysam.AlignmentFile(BAM_PATH_OUT, "wbu", template=bamFile)
 
-    allFasta = FastaContent(NANOPORE_FASTA)
-    allFastaDict = {}
-    for i, x in enumerate(allFasta.iter()):
-        allFastaDict[x.name] = x
+    if not IN_DISK:
+        allFasta = FastaContent(NANOPORE_FASTA, False)
+        allFastaDict = {}
+        for i, x in enumerate(allFasta.iter()):
+            allFastaDict[x.name] = x
+    else:
+        allFastaDict = FastaContent(NANOPORE_FASTA, True)
 
     allReadGenerate = mlt.chunked(bamFile, 40000)
     splicedReadGenerate = mlt.ichunked(allReadGenerate, 8)

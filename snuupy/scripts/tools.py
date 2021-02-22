@@ -9,7 +9,6 @@ import glob
 from ont_fast5_api.fast5_interface import get_fast5_file
 import scanpy as sc
 import matplotlib.pyplot as plt
-import anndata
 from scipy.stats import spearmanr, pearsonr, zscore
 from io import StringIO
 from concurrent.futures import ProcessPoolExecutor as Mtp

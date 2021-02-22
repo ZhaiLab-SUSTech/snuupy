@@ -123,14 +123,15 @@ def _generateIlluminaWindowFromKb(
 @click.option("-i", "BAM_PATH", help="minimap2 output; bam format")
 @click.option("-f", "NANOPORE_FASTA", help="raw nanopore seq; fasta format")
 @click.option("-o", "BAM_PATH_OUT", help="output bam")
-def _addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT):
+@click.option("--in-disk", "IN_DISK", is_flag=True, help="store sequences on disk instead of mem")
+def _addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK):
     """
     \b
     get unmapped base tag
     """
     from scripts.addUnmappedBaseTag import addUnmappedBaseTag
 
-    addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT)
+    addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK)
 
 
 @main.command("generateNanoporeWindow")
