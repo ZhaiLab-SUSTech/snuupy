@@ -26,7 +26,7 @@ def scanRefFasta(refPath):
     return listPath
 
 
-def blastMapping(line, blastPath):
+def blastMapping(line, blastPath, blastMinScore):
     illuminaFilePath = f"{line.illuminaDir}{line.chr}/{line.window}/{line.fasta}"
     nanoporeFilePath = f"{line.nanoporeDir}{line.chr}/{line.window}.fa"
     name = line.fasta.split(".")[0]
@@ -45,7 +45,6 @@ def blastMapping(line, blastPath):
 
 
 def windowBlast(ILLUMINA_DIR, NANOPORE_DIR, BLAST_DIR, THREADS, BLAST_PATH, KIT):
-    global blastMinScore
     kitMinScore = {"v2": 26 - (2 * 6), "v3": 28 - (2 * 6)}
     blastMinScore = kitMinScore[KIT]
 
@@ -74,7 +73,7 @@ def windowBlast(ILLUMINA_DIR, NANOPORE_DIR, BLAST_DIR, THREADS, BLAST_PATH, KIT)
         creatUnexistedDir(f"{BLAST_DIR}{chr_}")
 
     Parallel(n_jobs=THREADS, batch_size=100)(
-        delayed(blastMapping)(line, blastPath)
+        delayed(blastMapping)(line, blastPath, blastMinScore)
         for line in illuminaFastaList.itertuples()
     )
 

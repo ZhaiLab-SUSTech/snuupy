@@ -159,15 +159,18 @@ def _generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, useColumn)
 @click.option("-i", "ILLUMINA_DIR", help='illumina dir; should end with "/"')
 @click.option("-n", "NANOPORE_DIR", help='nanopore dir; should end with "/"')
 @click.option("-o", "BLAST_DIR", help='result dir; should end with "/"')
-@click.option("-t", "THREADS", type=int, help="threads")
 @click.option("-b", "BLAST_PATH", help='blast path; should end with "/"')
-def _windowBlast(ILLUMINA_DIR, NANOPORE_DIR, BLAST_DIR, THREADS, BLAST_PATH):
+@click.option("-t", "THREADS", type=int, help="threads")
+@click.option(
+    "--kit", "KIT", default="v2", help="10x kit version; v2|v3", show_default=True
+)
+def _windowBlast(ILLUMINA_DIR, NANOPORE_DIR, BLAST_DIR, THREADS, BLAST_PATH, KIT):
     """
     blast find potential UMI/Bc
     """
     from scripts.windowBlast import windowBlast
 
-    windowBlast(ILLUMINA_DIR, NANOPORE_DIR, BLAST_DIR, THREADS, BLAST_PATH)
+    windowBlast(ILLUMINA_DIR, NANOPORE_DIR, BLAST_DIR, THREADS, BLAST_PATH, KIT)
 
 
 @main.command("getMismatch")
@@ -175,13 +178,16 @@ def _windowBlast(ILLUMINA_DIR, NANOPORE_DIR, BLAST_DIR, THREADS, BLAST_PATH):
 @click.option("-b", "ADD_SEQ_BAM", help="bam added unmapped seq tag")
 @click.option("-o", "OUT_FEATHER", help="output feather format")
 @click.option("-t", "THREADS", type=int, help="threads")
-def _getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS):
+@click.option(
+    "--kit", "KIT", default="v2", help="10x kit version; v2|v3", show_default=True
+)
+def _getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT):
     """
     calculate mismatch based on blast results
     """
     from scripts.getMismatch import getMismatch
 
-    getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS)
+    getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT)
 
 
 @main.command("barcodeAssignment")
@@ -430,9 +436,10 @@ def _polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads):
     help="only use those intron to calculate splicing matrix; if not provided, all intron will be used",
 )
 @click.option(
-    "--only-FullLength",
+    "--only-FullLength/--not-FullLength",
     "onlyFullLength",
-    is_flag=True,
+    default=True,
+    show_default=True,
     help="only use full length generate splice matrix or not",
 )
 @click.option(
