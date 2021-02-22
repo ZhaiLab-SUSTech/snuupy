@@ -1,12 +1,11 @@
 import pysam
 import click
-import pyfastx
 import itertools
 import numpy as np
 import pandas as pd
 import more_itertools as mlt
 from concurrent.futures import ThreadPoolExecutor
-from .tools import isOne, getBlock
+from .tools import isOne, getBlock, FastaContent
 
 
 def isExceedExtend(read, introns):
@@ -59,7 +58,7 @@ def getClipLength(cigar, exceedExtend, pos):
 
 
 def getFasta(seq, length):
-    return [seq[: length[0]], seq[-length[-1] :]]
+    return [seq[:length[0]], seq[-length[-1]:]]
 
 
 def singleReadProcess(read, allFasta):
@@ -82,7 +81,7 @@ def singleReadProcess(read, allFasta):
 
         length = [fiveLength, threeLength]
         seq = (
-            allFasta[read.qname].antisense
+            allFasta[read.qname].getAnti().seq
             if read.is_reverse
             else allFasta[read.qname].seq
         )
@@ -148,9 +147,9 @@ def addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT):
     bamFile = pysam.AlignmentFile(BAM_PATH, "rb")
     bamFileOut = pysam.AlignmentFile(BAM_PATH_OUT, "wbu", template=bamFile)
 
-    allFasta = pyfastx.Fasta(NANOPORE_FASTA)
+    allFasta = FastaContent(NANOPORE_FASTA)
     allFastaDict = {}
-    for i, x in enumerate(allFasta):
+    for i, x in enumerate(allFasta.iter()):
         allFastaDict[x.name] = x
 
     allReadGenerate = mlt.chunked(bamFile, 40000)
