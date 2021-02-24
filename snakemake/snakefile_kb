@@ -22,7 +22,7 @@ rule runKb:
         KbOutputDir = f"{config['resultDir']}step1_runKb/KbOutputDir/",
         gpu = "0"
 
-    threads:2
+    threads:56
     shell:
         """
 cd {pipelineDir}
