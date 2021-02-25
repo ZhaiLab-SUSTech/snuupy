@@ -76,6 +76,3 @@ Commands:
 
 # Acknowledge
 This pipeline was inspired by Sicelore
-
-# Open source license
-The source code is released under MIT license. 
