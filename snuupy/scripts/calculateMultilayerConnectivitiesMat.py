@@ -28,7 +28,8 @@ def main(multiMatPath, useGenePath, outPath):
             AT1G01020
             AT1G01030
     outPath:
-        fused connectivities matrix. npy format, could be loaded by numpy.load function
+        prefix of output file containing fused connectivities matrix and leiden clustering result.
+            matrix: npy format, could be loaded by numpy.load function
     """
 
     adata = updateOldMultiAd(sc.read_10x_mtx(multiMatPath))
@@ -45,4 +46,9 @@ def main(multiMatPath, useGenePath, outPath):
         [abunAd.X.A, apaAd.X.A, spliceAd.X.A], metric="correlation", K=20
     )
     fusedMat = snf.snf(similarityMat, K=20, alpha=0.5, t=10)
-    np.save(outPath, fusedMat)
+    np.save(f"{outPath}_fusedMat.npy", fusedMat)
+
+    sc.tl.leiden(adata, resolution=0.9, adjacency=fusedMat, key_added="leiden_fused")
+    
+    clusterDf = adata.obs[["leiden_fused"]]
+    clusterDf.to_csv(f"{outPath}_leiden_resolution_0.9.tsv", sep="\t")
