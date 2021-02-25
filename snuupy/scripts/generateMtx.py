@@ -18,7 +18,7 @@ from .tools import transformExpressionMatrixTo10XMtx
 
 def parseReadApaInfo(apaClusterPath, inBamPath, geneTag, expressionInfo):
     """
-    解析apa信息 从wp pipeline中获得apacluster info 随后对每个read进行注释
+    parse APA information, and classify each read into corresponding PAC
     """
     apaCluster = pr.read_bed(apaClusterPath, True)
     apaCluster["Name"] = apaCluster["Name"] + "_APA"
@@ -92,16 +92,7 @@ def generateMtx(
     onlyFullLength,
 ):
     """
-    生成10X expression mtx 含有splice (APA) Info
-
-    \b
-    -a: polyAcluster bed ./single_cell_root.polya_cluster.bed
-    --bam: 带有geneId的nanopore Bam
-    --tag: geneId tag名 默认gi
-    -i : ./step14_getIrInfo/irInfo.tsv
-    -o : 文件夹 10X表达矩阵
-    --intronList : 只使用该tsv内的intron
-    --full-length
+    generate expression mtx (format 10x)
     """
     mode = []
     if (apaClusterPath != "False") & (inBamPath != "False"):
@@ -115,7 +106,6 @@ def generateMtx(
     if not mode:
         logger.warning("expression only mode")
 
-    ## 读取ir情况 并且生成含有splice信息的表达矩阵
     readIrInfo = pd.read_csv(inIrInfoPath, sep="\t")
 
     # readIrInfo['fullySpliced'] = readIrInfo['IntronOverlapInfo'].isna().astype(str)
@@ -144,9 +134,7 @@ def generateMtx(
         else:
             useIntronDict = False
 
-        # 0 去除 并且不计数
-        # 1 计数 不带intron
-        # 2 计数 带intron
+
         def getIntronSpliceInfo(line):
             if onlyFullLength:
                 if line.exonOverlapCounts != line.GeneExonCounts:
