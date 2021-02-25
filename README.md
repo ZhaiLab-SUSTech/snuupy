@@ -76,4 +76,5 @@ Commands:
 
 # Acknowledge
 This pipeline was inspired by Sicelore
+
 Function calculateMultilayerConnectivitiesMat is inspired by scLAPA
