@@ -65,6 +65,7 @@ Commands:
   - more_itertools
   - biopython
   - pyfastx
+  - snfpy
 - Snakemake 
 - minimap2 
 - poaV2 
