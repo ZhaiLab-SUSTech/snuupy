@@ -10,26 +10,31 @@ Git clone or download this repository then modify the paths in the configuration
 
 # usage
 
-snuupy.py [OPTIONS] COMMAND [ARGS]
+snuupy.py [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  --help  Show this message and exit.
 
 Commands:
+  addGeneName                     parse polished reads mapping results...
+  addPolyATag                     add polyA length tag for bam files
+  addUnmappedBaseTag              get unmapped base tag
+  barcodeAssignment               assign barcode for each Nanopore...
+  calculateMultilayerConnectivitiesMat
+                                  In short, we first separately...
+  generateH5adFromKb              get adata from kbpython result...
+  generateIlluminaWindow          output illumina reads based on...
+  generateIlluminaWindowFromKb    generate illumina windows from...
+  generateMtx                     generate matrices
+  generateNanoporeWindow          output nanopore reads based on...
+  getMismatch                     calculate mismatch based on blast...
+  getSpliceInfo                   get splice information which used...
+  parseIllumina                   parse Illumina bam file and...
+  polishReads                     polish barcode assigned Nanopore...
+  polyAClusterDetected            detect PolyA Cluster
+  windowBlast                     blast find potential UMI/Bc
 
-  - addGeneName
-  - addPolyATag
-  - addUnmappedBaseTag
-  - barcodeAssignment
-  - generateH5adFromKb
-  - generateIlluminaWindow
-  - generateIlluminaWindowFromKb
-  - generateMtx
-  - generateNanoporeWindow
-  - getMismatch
-  - getSpliceInfo
-  - parseIllumina
-  - polishReads
-  - polyAClusterDetected
-  - windowBlast
-
+<img src="./snakemake/pipeline.svg" width="500" height="700">
 
 # packages required
 - python3 
