@@ -3,12 +3,12 @@
 
 single-nucleus utility in python
 
-# tutorial
+# Tutorial
 ![Schematic_diagram](./Schematic_diagram.png)
 
 Git clone or download this repository then modify the paths in the configuration file before running snakemake. 
 
-# usage
+# Usage
 ```text
 snuupy.py [OPTIONS] COMMAND [ARGS]...
 
@@ -52,7 +52,7 @@ Commands:
 ```
 <img src="./snakemake/pipeline.svg" width="500" height="700">
 
-# packages required
+# Packages required
 - python3 
   - pandas 
   - scipy 
@@ -74,8 +74,8 @@ Commands:
 - picard 
 
 
-# acknowledge
+# Acknowledge
 This pipeline was inspired by Sicelore
 
-# open source license
+# Open source license
 The source code is released under MIT license. 
