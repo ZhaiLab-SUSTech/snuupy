@@ -509,7 +509,8 @@ def _calculateMultilayerConnectivitiesMat(multiMatPath, useGenePath, outPath):
                 AT1G01020
                 AT1G01030
         outPath:
-            fused connectivities matrix. npy format, could be loaded by numpy.load function
+            prefix of output file containing fused connectivities matrix and leiden clustering result.
+                matrix: npy format, could be loaded by numpy.load function
     """
     from scripts.calculateMultilayerConnectivitiesMat import main as cmcm
     cmcm(multiMatPath, useGenePath, outPath)
