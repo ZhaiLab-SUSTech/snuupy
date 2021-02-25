@@ -9,7 +9,7 @@ single-nucleus utility in python
 Git clone or download this repository then modify the paths in the configuration file before running snakemake. 
 
 # usage
-
+```text
 snuupy.py [OPTIONS] COMMAND [ARGS]...
 
 Options:
@@ -49,7 +49,7 @@ Commands:
   polyAClusterDetected            detect PolyA Cluster
   
   windowBlast                     blast find potential UMI/Bc
-
+```
 <img src="./snakemake/pipeline.svg" width="500" height="700">
 
 # packages required
