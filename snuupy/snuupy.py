@@ -483,11 +483,11 @@ def _generateMtx(
         onlyFullLength,
     )
 
-@main.command("calculateMultilayerConnectivitiesMat")
+@main.command("multilayerClustering")
 @click.option('--mtx', 'multiMatPath', required=True)
 @click.option('--gene', 'useGenePath')
 @click.option('-o', 'outPath', required=True)
-def _calculateMultilayerConnectivitiesMat(multiMatPath, useGenePath, outPath):
+def _multilayerClustering(multiMatPath, useGenePath, outPath):
     """
     In short, we first separately calculate euclidean mat for dimension reduced gene expression mat, APA mat and spliced mat.
     then use SNF method fusion these matrices, the resulting mat can be load to clustering algorithms, such as leiden.
