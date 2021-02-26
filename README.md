@@ -13,42 +13,29 @@ Git clone or download this repository then modify the paths in the configuration
 snuupy.py [OPTIONS] COMMAND [ARGS]...
 
 Options:
-
   --help  Show this message and exit.
 
 Commands:
+  addGeneName                   parse polished reads mapping results and
+                                get...
 
-  addGeneName                     parse polished reads mapping results...
-  
-  addPolyATag                     add polyA length tag for bam files
-  
-  addUnmappedBaseTag              get unmapped base tag
-  
-  barcodeAssignment               assign barcode for each Nanopore...
-  
-  calculateMultilayerConnectivitiesMat   In short, we first separately...
-                                  
-  generateH5adFromKb              get adata from kbpython result...
-  
-  generateIlluminaWindow          output illumina reads based on...
-  
-  generateIlluminaWindowFromKb    generate illumina windows from...
-  
-  generateMtx                     generate matrices
-  
-  generateNanoporeWindow          output nanopore reads based on...
-  
-  getMismatch                     calculate mismatch based on blast...
-  
-  getSpliceInfo                   get splice information which used...
-  
-  parseIllumina                   parse Illumina bam file and...
-  
-  polishReads                     polish barcode assigned Nanopore...
-  
-  polyAClusterDetected            detect PolyA Cluster
-  
-  windowBlast                     blast find potential UMI/Bc
+  addPolyATag                   add polyA length tag for bam files
+  addUnmappedBaseTag            get unmapped base tag
+  barcodeAssignment             assign barcode for each Nanopore read;
+                                based...
+
+  generateH5adFromKb            get adata from kbpython result --tg:...
+  generateIlluminaWindow        output illumina reads based on mapping info
+  generateIlluminaWindowFromKb  generate illumina windows from kb_python...
+  generateMtx                   generate matrices
+  generateNanoporeWindow        output nanopore reads based on mapping info
+  getMismatch                   calculate mismatch based on blast results
+  getSpliceInfo                 get splice information which used for...
+  multilayerClustering          In short, we first separately calculate...
+  parseIllumina                 parse Illumina bam file and generate...
+  polishReads                   polish barcode assigned Nanopore reads
+  polyAClusterDetected          detect PolyA Cluster
+  windowBlast                   blast find potential UMI/Bc
 ```
 <img src="./snakemake/pipeline.svg" width="500" height="700">
 
@@ -77,4 +64,4 @@ Commands:
 # Acknowledge
 This pipeline was inspired by Sicelore
 
-Function calculateMultilayerConnectivitiesMat is inspired by scLAPA
+Function multilayerClustering is inspired by scLAPA
