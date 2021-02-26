@@ -1,7 +1,7 @@
 # This method is a pre-release version
 # we have not verified this method
 # This method is inspired by scLAPA (https://github.com/BMILAB/scLAPA)
-# In short, we first separately calculate correlation mat for gene expression mat, APA mat and spliced mat.
+# In short, we first separately calculate correlation mat  for dimension reduced expression mat, APA mat and spliced mat.
 # then use SNF method fusion these matrices, the resulting mat can be load to clustering algorithms, such as leiden.
 
 import numpy as np
@@ -13,7 +13,7 @@ from .tools import updateOldMultiAd, getMatFromObsm
 
 def main(multiMatPath, useGenePath, outPath):
     """
-    In short, we first separately calculate correlation mat for gene expression mat, APA mat and spliced mat.
+    In short, we first separately calculate euclidean mat for dimension reduced gene expression mat, APA mat and spliced mat.
     then use SNF method fusion these matrices, the resulting mat can be load to clustering algorithms, such as leiden.
     This method is inspired by scLAPA (https://github.com/BMILAB/scLAPA)
 
@@ -29,8 +29,13 @@ def main(multiMatPath, useGenePath, outPath):
             AT1G01030
     outPath:
         prefix of output file containing fused connectivities matrix and leiden clustering result.
-            matrix: npy format, could be loaded by numpy.load function
+        matrix: fused eulidean mat npy format, could be loaded by numpy.load function
     """
+
+    def __calSimMat(adata):
+        sc.pp.scale(adata, max_value=10)
+        sc.tl.pca(adata, svd_solver="arpack", n_comps=50)
+        sc.pp.neighbors(adata, n_pcs=30)
 
     adata = updateOldMultiAd(sc.read_10x_mtx(multiMatPath))
 
@@ -38,17 +43,24 @@ def main(multiMatPath, useGenePath, outPath):
         useGeneLs = pd.read_table(useGenePath, header=None, names=["gene"])["gene"]
         adata = adata[:, useGeneLs]
 
-    spliceAd = getMatFromObsm(adata, "Spliced", adata.var.index, ignoreN=True)
-    apaAd = getMatFromObsm(adata, "APA", adata.var.index, ignoreN=True)
-    abunAd = getMatFromObsm(adata, "Abundance", adata.var.index, ignoreN=True)
-
-    similarityMat = snf.make_affinity(
-        [abunAd.X.A, apaAd.X.A, spliceAd.X.A], metric="correlation", K=20
+    spliceAd = getMatFromObsm(
+        adata, "Spliced", adata.var.index, ignoreN=True, clear=True
     )
+
+    apaAd = getMatFromObsm(adata, "APA", adata.var.index, ignoreN=True, clear=True)
+
+    abunAd = getMatFromObsm(
+        adata, "Abundance", adata.var.index, ignoreN=True, clear=True
+    )
+
+    [__calSimMat(x) for x in [spliceAd, apaAd, abunAd]]
+
+    similarityMat = [x.obsp["connectivities"].A for x in [abunAd, apaAd, spliceAd]]
+
     fusedMat = snf.snf(similarityMat, K=20, alpha=0.5, t=10)
     np.save(f"{outPath}_fusedMat.npy", fusedMat)
 
-    sc.tl.leiden(adata, resolution=0.9, adjacency=fusedMat, key_added="leiden_fused")
-    
+    sc.tl.leiden(adata, adjacency=fusedMat, key_added="leiden_fused")
+
     clusterDf = adata.obs[["leiden_fused"]]
-    clusterDf.to_csv(f"{outPath}_leiden_resolution_0.9.tsv", sep="\t")
+    clusterDf.to_csv(f"{outPath}_leiden_resolution_1.0.tsv", sep="\t")

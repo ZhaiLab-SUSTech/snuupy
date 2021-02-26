@@ -489,31 +489,28 @@ def _generateMtx(
 @click.option('-o', 'outPath', required=True)
 def _calculateMultilayerConnectivitiesMat(multiMatPath, useGenePath, outPath):
     """
-    In short, we first separately calculate correlation mat for gene expression mat, APA mat and spliced mat. 
-    Then use SNF method fusion these matrices, the resulting mat can be load to clustering algorithms, such as leiden.
+    In short, we first separately calculate euclidean mat for dimension reduced gene expression mat, APA mat and spliced mat.
+    then use SNF method fusion these matrices, the resulting mat can be load to clustering algorithms, such as leiden.
     This method is inspired by scLAPA (https://github.com/BMILAB/scLAPA)
 
     \b
     we have not verified this method and it is a pre-release version.
-    
+
     \b
-    options:
-        multiMatPath:
-            multilayer mat path
-        useGenePath:
-            gene used for calculating correlation matrix. 
-            if not provided, all gene will be used.
-            NO HEADER, NO INDEX!
-            e.g:
-                AT1G01010
-                AT1G01020
-                AT1G01030
-        outPath:
-            prefix of output file containing fused connectivities matrix and leiden clustering result.
-                matrix: npy format, could be loaded by numpy.load function
+    multiMatPath:
+        multilayer mat path
+    useGenePath:
+        gene used for calculating correlation matrix. if not provided, all gene will be used. NO HEADER, NO INDEX
+        e.g:
+            AT1G01010
+            AT1G01020
+            AT1G01030
+    outPath:
+        prefix of output file containing fused connectivities matrix and leiden clustering result.
+        matrix: fused eulidean mat npy format, could be loaded by numpy.load function
     """
-    from scripts.calculateMultilayerConnectivitiesMat import main as cmcm
-    cmcm(multiMatPath, useGenePath, outPath)
+    from scripts.multilayerClustering import main as multiCluster
+    multiCluster(multiMatPath, useGenePath, outPath)
 
 
 main()

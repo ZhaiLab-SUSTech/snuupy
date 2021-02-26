@@ -520,36 +520,44 @@ def updateOldMultiAd(adata):
     return adata
 
 
-def getMatFromObsm(
-    adata, keyword, useGeneLs=[], normalize=True, logScale=True, ignoreN=False
-):
+def getMatFromObsm(adata, keyword, useGeneLs=[], normalize=True, logScale=True, ignoreN=False, clear=False):
     """
     use MAT deposited in obsm replace the X MAT
 
     params:
         adata:
             version 1.0 multiAd
-        keyword:
+        keyword: 
             stored in obsm
         useGeneLs:
             if not specified useGeneLs, all features will be output, otherwise only features associated with those gene will be output
         normalize:
             normalize the obtained Mtx or not
-        logScale:
+        logScale: 
             log-transformed or not
         ignoreN:
             ignore ambiguous APA/Splice info
+        clear:
+            data not stored in obs or var will be removed
     return:
         anndata
     """
-    transformedAd = anndata.AnnData(
-        X=adata.obsm[keyword].copy(),
-        obs=adata.obs,
-        var=adata.uns[f"{keyword}_label"].to_frame().drop(0, axis=1),
-        obsp=adata.obsp,
-        obsm=adata.obsm,
-        uns=adata.uns,
-    )
+    if clear:
+        transformedAd = anndata.AnnData(
+            X=adata.obsm[keyword].copy(),
+            obs=adata.obs,
+            var=adata.uns[f"{keyword}_label"].to_frame().drop(0, axis=1),
+        )
+    else:
+        transformedAd = anndata.AnnData(
+            X=adata.obsm[keyword].copy(),
+            obs=adata.obs,
+            var=adata.uns[f"{keyword}_label"].to_frame().drop(0, axis=1),
+            obsp=adata.obsp,
+            obsm=adata.obsm,
+            uns=adata.uns,
+        )
+
     if normalize:
         sc.pp.normalize_total(transformedAd, target_sum=1e4)
     if logScale:
@@ -564,12 +572,10 @@ def getMatFromObsm(
             transformedAdFeatureSr.str.split("_").str[0].isin(useGeneLs)
         )
         transformedAd = transformedAd[:, transformedAdFeatureFilterBl]
-
+    
     if ignoreN:
         transformedAdFeatureSr = transformedAd.var.index
-        transformedAdFeatureFilterBl = (
-            ~transformedAdFeatureSr.str.split("_").str[1].isin(["N", "Ambiguous"])
-        )
+        transformedAdFeatureFilterBl = ~transformedAdFeatureSr.str.split("_").str[1].isin(['N', 'Ambiguous'])
 
         transformedAd = transformedAd[:, transformedAdFeatureFilterBl]
 
