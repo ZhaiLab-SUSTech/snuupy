@@ -255,7 +255,7 @@ def extractSeq(fastqDir, outDir, lmdbPath, threads, splitInput, cutoff):
 
         allR1Path = glob.glob(f'{fastqDir}*_R1*')
         allR2Path = [x.replace('R1', 'R2') for x in allR1Path]
-        allSplitedPath = [fastqTemp + re.search(r'(?<=/)\w+?(?=_R1)', x)[0] + '/' for x in allR1Path]
+        allSplitedPath = [fastqTemp + re.search(r'(?<=/)[\w\W]+?(?=_R1)', x)[0] + '/' for x in allR1Path]
 
         if allR1Path[0].endswith('.gz'):
             formatGz = True
@@ -278,7 +278,7 @@ def extractSeq(fastqDir, outDir, lmdbPath, threads, splitInput, cutoff):
 
             tempAllSplitedR1Path = glob.glob(f'{fastqTemp}*/*R1*')
             tempAllSplitedR2Path = [x.replace('R1', 'R2') for x in tempAllSplitedR1Path]
-            sampleId = set([re.search(r'(?<=/)\w+?(?=_L)',x)[0] for x in tempAllSplitedR1Path])
+            sampleId = set([re.search(r'(?<=/)[\w\W]+?(?=_L)',x)[0] for x in tempAllSplitedR1Path])
 
             if len(sampleId) != 1:
                 raise NameError("MORE THAN ONE INPUT SAMPLES")
