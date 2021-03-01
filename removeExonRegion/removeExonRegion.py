@@ -31,7 +31,7 @@ def _runCellRanger(parameterPath):
 @click.option('--buffer', 'bufferSize', default='30G', show_default=True, help='split bam buffer size')
 @click.option('--fastq', 'fastqDir', help='Dir stored 10x illumina reads; end with "\\"')
 @click.option('--out', 'outDir', help='output dir; end with "\\"')
-@click.option('--cutoff', 'cutoff', type=int, default=75, help='reads chopped shorter than <cutoff> will be discarded')
+@click.option('--cutoff', 'cutoff', type=int, default=50, help='reads chopped shorter than <cutoff> will be discarded')
 def _extractExonBases(bamPath, tempDir, threads, picardPath, bedAnnoPath, bufferSize, fastqDir, outDir, cutoff):
     """
     extract reads exon mapping region bases
