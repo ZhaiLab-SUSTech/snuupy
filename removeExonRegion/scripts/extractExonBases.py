@@ -17,35 +17,44 @@ from .tools import writeFastq, readFastq, getSubFastq
 
 
 def splitBam(bamPath, splitedDir, splitedCounts, picardPath):
-    sh.mkdir(f"{splitedDir}")
-    os.system(
-        f"java -jar {picardPath} SplitSamByNumberOfReads I={bamPath} OUTPUT={splitedDir} N_FILES={splitedCounts}"
-    )
+    if os.path.exists(splitedDir):
+        logger.warning(f"{splitedDir} existed. step - splitBam skipped!")
+    else:
+        sh.mkdir(f"{splitedDir}")
+        os.system(
+            f"java -jar {picardPath} SplitSamByNumberOfReads I={bamPath} OUTPUT={splitedDir} N_FILES={splitedCounts}"
+        )
+
 
 def getOverlapTsv(bam, bed, tsv):
     os.system(f"bedtools intersect -abam {bam} -b {bed} -split -bed -wo -s > {tsv}")
 
+
 def getOverlapInfo(splitedDir, tsvPath, threads, bedAnnoPath, bufferSize):
     tempDir = "/".join(splitedDir.split("/")[:-2]) + "/getOverlapTemp/"
-    os.mkdir(tempDir)
 
-    allChunkedBam = [splitedDir + x for x in os.listdir(splitedDir)]
-    allChunkedOverlapInfo = [
-        ".".join(x.split(".")[:-1]) + "_overlap.tsv" for x in allChunkedBam
-    ]
+    if os.path.exists(tempDir):
+        logger.warning(f"{tempDir} existed. step - getOverlapInfo skipped!")
+    else:
+        os.mkdir(tempDir)
 
-    with multiP(threads) as mP:
-        for singleBam, singleTsv in zip(allChunkedBam, allChunkedOverlapInfo):
-            mP.submit(getOverlapTsv, singleBam, bedAnnoPath, singleTsv)
+        allChunkedBam = [splitedDir + x for x in os.listdir(splitedDir)]
+        allChunkedOverlapInfo = [
+            ".".join(x.split(".")[:-1]) + "_overlap.tsv" for x in allChunkedBam
+        ]
 
-    os.system(
-        f"""
-    LC_ALL=C cat {' '.join(allChunkedOverlapInfo)} |\
-        LC_ALL=C sort -T {tempDir} -S {bufferSize} --parallel {threads} -k 4,4 -k 25nr,25 |\
-            LC_ALL=C sort -T {tempDir} -S {bufferSize} --parallel {threads} -k 4,4 -u > {tsvPath} &&\
-                rm -rf {tempDir}
-    """
-    )
+        with multiP(threads) as mP:
+            for singleBam, singleTsv in zip(allChunkedBam, allChunkedOverlapInfo):
+                mP.submit(getOverlapTsv, singleBam, bedAnnoPath, singleTsv)
+
+        os.system(
+            f"""
+        LC_ALL=C cat {' '.join(allChunkedOverlapInfo)} |\
+            LC_ALL=C sort -T {tempDir} -S {bufferSize} --parallel {threads} -k 4,4 -k 25nr,25 |\
+                LC_ALL=C sort -T {tempDir} -S {bufferSize} --parallel {threads} -k 4,4 -u > {tsvPath}
+        """
+        )
+
 
 def getGeneExon(line):
     geneBlockStarts = line.geneBlockStarts
@@ -58,6 +67,7 @@ def getGeneExon(line):
         geneBlockSizes = geneBlockSizes[::-1]
     for singleBlockStart, singleBlockSize in zip(geneBlockStarts, geneBlockSizes):
         yield jI(singleBlockStart, singleBlockStart + singleBlockSize, 0)
+
 
 def getReadBlock(line):
     readBlockStarts = line.BlockStarts
@@ -161,190 +171,280 @@ def writeResult(mdbFile, severalChunkResult):
     else:
         pass
 
-def getUsefulRegion(tsvPath, lmdbPath, threads):
-    NAMES = [
-        "Chromosome",
-        "Start",
-        "End",
-        "Name",
-        "Score",
-        "Strand",
-        "ThickStart",
-        "ThickEnd",
-        "ItemRGB",
-        "BlockCount",
-        "BlockSizes",
-        "BlockStarts",
-        "geneChromosome",
-        "geneStart",
-        "geneEnd",
-        "geneName",
-        "geneScore",
-        "geneStrand",
-        "geneThickStart",
-        "geneThickEnd",
-        "geneItemRGB",
-        "geneBlockCount",
-        "geneBlockSizes",
-        "geneBlockStarts",
-        "cov",
-    ]
-    USECOLS = [
-        "Chromosome",
-        "Start",
-        "End",
-        "Name",
-        "Strand",
-        "BlockSizes",
-        "BlockStarts",
-        "geneStart",
-        "geneEnd",
-        "geneName",
-        "geneBlockCount",
-        "geneBlockSizes",
-        "geneBlockStarts",
-    ]
-    bedFileChunked = chunked(
-        pd.read_table(tsvPath, names=NAMES, usecols=USECOLS, chunksize=48*1024), threads
-    )
 
-    severalChunkResult = []
-    with lmdb.open(lmdbPath, map_size=1099511627776) as mdbDataBase:
-        mdbFile = mdbDataBase.begin(write=True)
-        while True:
-            try:
-                with multiT(2) as mT:
-                    writeThread = mT.submit(writeResult, mdbFile, severalChunkResult)
-                    severalChunkResult = mT.submit(
-                        processSeveralChunks, bedFileChunked, threads
-                    ).result()
-                    writeThread.result()
-            except StopIteration:
-                break
-        mdbFile.commit()
+def getUsefulRegion(tsvPath, lmdbPath, threads):
+    if os.path.exists(lmdbPath):
+        logger.warning(f"{lmdbPath} existed. step - parseOverlapRegion skipped!")
+    else:
+        NAMES = [
+            "Chromosome",
+            "Start",
+            "End",
+            "Name",
+            "Score",
+            "Strand",
+            "ThickStart",
+            "ThickEnd",
+            "ItemRGB",
+            "BlockCount",
+            "BlockSizes",
+            "BlockStarts",
+            "geneChromosome",
+            "geneStart",
+            "geneEnd",
+            "geneName",
+            "geneScore",
+            "geneStrand",
+            "geneThickStart",
+            "geneThickEnd",
+            "geneItemRGB",
+            "geneBlockCount",
+            "geneBlockSizes",
+            "geneBlockStarts",
+            "cov",
+        ]
+        USECOLS = [
+            "Chromosome",
+            "Start",
+            "End",
+            "Name",
+            "Strand",
+            "BlockSizes",
+            "BlockStarts",
+            "geneStart",
+            "geneEnd",
+            "geneName",
+            "geneBlockCount",
+            "geneBlockSizes",
+            "geneBlockStarts",
+        ]
+        bedFileChunked = chunked(
+            pd.read_table(tsvPath, names=NAMES, usecols=USECOLS, chunksize=48 * 1024),
+            threads,
+        )
+
+        severalChunkResult = []
+        with lmdb.open(lmdbPath, map_size=1099511627776) as mdbDataBase:
+            mdbFile = mdbDataBase.begin(write=True)
+            while True:
+                try:
+                    with multiT(2) as mT:
+                        writeThread = mT.submit(
+                            writeResult, mdbFile, severalChunkResult
+                        )
+                        severalChunkResult = mT.submit(
+                            processSeveralChunks, bedFileChunked, threads
+                        ).result()
+                        writeThread.result()
+                except StopIteration:
+                    break
+            mdbFile.commit()
+
 
 def processOneFastq(singleR1Path, singleR2Path, lmdbPath, outDir, cutoff):
     singleR1File, singleR2File = readFastq(singleR1Path), readFastq(singleR2Path)
-    singleR1OutFile, singleR2OutFile = outDir + singleR1Path.split('/')[-1], outDir + singleR2Path.split('/')[-1]
-    with lmdb.open(lmdbPath, map_size=1099511627776) as mdbDataBase, open(singleR1OutFile, 'w') as fh1, open(singleR2OutFile, 'w') as fh2:
+    singleR1OutFile, singleR2OutFile = (
+        outDir + singleR1Path.split("/")[-1],
+        outDir + singleR2Path.split("/")[-1],
+    )
+    with lmdb.open(lmdbPath, map_size=1099511627776) as mdbDataBase, open(
+        singleR1OutFile, "w"
+    ) as fh1, open(singleR2OutFile, "w") as fh2:
         mdbFile = mdbDataBase.begin()
         for singleRead1, singleRead2 in zip(singleR1File, singleR2File):
             singleUsefulRegion = mdbFile.get(singleRead1.name.encode())
             if singleUsefulRegion:
-                singleUsefulRegion = np.frombuffer(singleUsefulRegion, dtype=int).reshape(-1, 2)
-                singleRead2Corrected=getSubFastq(singleRead2, singleUsefulRegion)
-                if len(singleRead2Corrected.seq) >= cutoff :
+                singleUsefulRegion = np.frombuffer(
+                    singleUsefulRegion, dtype=int
+                ).reshape(-1, 2)
+                singleRead2Corrected = getSubFastq(singleRead2, singleUsefulRegion)
+                if len(singleRead2Corrected.seq) >= cutoff:
                     writeFastq(singleRead1, fh1)
                     writeFastq(singleRead2Corrected, fh2)
+
 
 def extractSeq(fastqDir, outDir, lmdbPath, threads, splitInput, cutoff):
     try:
         os.mkdir(outDir)
     except:
-        logger.warning(f'{outDir} existed!!')
+        logger.warning(f"{outDir} existed!!")
     if not splitInput:
-        allR1Path = glob.glob(f'{fastqDir}*R1*')
-        allR2Path = [x.replace('R1', 'R2') for x in allR1Path]
+        allR1Path = glob.glob(f"{fastqDir}*R1*")
+        allR2Path = [x.replace("R1", "R2") for x in allR1Path]
     else:
 
-        fastqTemp = outDir + 'tempSplited/'
+        fastqTemp = outDir + "tempSplited/"
         try:
             sh.mkdir(fastqTemp)
         except:
-            logger.warning(f'{fastqTemp} existed!!')
+            logger.warning(f"{fastqTemp} existed!!")
 
-        allR1Path = glob.glob(f'{fastqDir}*_R1*')
-        allR2Path = [x.replace('R1', 'R2') for x in allR1Path]
-        allSplitedPath = [fastqTemp + re.search(r'(?<=/)[\w\W]+?(?=_R1)', x)[0] + '/' for x in allR1Path]
+        allR1Path = glob.glob(f"{fastqDir}*_R1*")
+        allR2Path = [x.replace("R1", "R2") for x in allR1Path]
+        allSplitedPath = [
+            fastqTemp + re.search(r"[\w\W]+?(?=_R1)", x.split("/")[-1])[0] + "/"
+            for x in allR1Path
+        ]
 
-        if allR1Path[0].endswith('.gz'):
+        if allR1Path[0].endswith(".gz"):
             formatGz = True
         else:
             formatGz = False
 
         splitedNum = threads // len(allSplitedPath)
-        
-        if splitedNum <= 1 :
-            allR1Path = glob.glob(f'{fastqDir}*R1*')
-            allR2Path = [x.replace('R1', 'R2') for x in allR1Path]
-            if allR1Path[0].endswith('.gz'):
-                logger.error('format gz, please uncompress it.')
-                1/0
+
+        if splitedNum <= 1:
+            allR1Path = glob.glob(f"{fastqDir}*R1*")
+            allR2Path = [x.replace("R1", "R2") for x in allR1Path]
+            if allR1Path[0].endswith(".gz"):
+                logger.error("format gz, please uncompress it.")
+                1 / 0
         else:
             mPResults = []
-            with multiP(threads//2) as mP:
-                for singleR1Path, singleR2Path, singleSplitedPath in zip(allR1Path, allR2Path, allSplitedPath):
-                    mPResults.append(mP.submit(sh.seqkit, "split2", "-f", "-1", singleR1Path, "-2", singleR2Path, p=splitedNum, O=singleSplitedPath, j=2))
+            with multiP(threads // 2) as mP:
+                for singleR1Path, singleR2Path, singleSplitedPath in zip(
+                    allR1Path, allR2Path, allSplitedPath
+                ):
+                    mPResults.append(
+                        mP.submit(
+                            sh.seqkit,
+                            "split2",
+                            "-f",
+                            "-1",
+                            singleR1Path,
+                            "-2",
+                            singleR2Path,
+                            p=splitedNum,
+                            O=singleSplitedPath,
+                            j=2,
+                        )
+                    )
 
-            tempAllSplitedR1Path = glob.glob(f'{fastqTemp}*/*R1*')
-            tempAllSplitedR2Path = [x.replace('R1', 'R2') for x in tempAllSplitedR1Path]
-            sampleId = set([re.search(r'(?<=/)[\w\W]+?(?=_L)',x)[0] for x in tempAllSplitedR1Path])
+            tempAllSplitedR1Path = glob.glob(f"{fastqTemp}*/*R1*")
+            tempAllSplitedR2Path = [x.replace("R1", "R2") for x in tempAllSplitedR1Path]
+            sampleId = set(
+                [
+                    re.search(r"(?<=tempSplited/)[\w\W]+?(?=_L)", x)[0]
+                    for x in tempAllSplitedR1Path
+                ]
+            )
 
             if len(sampleId) != 1:
-                raise NameError("MORE THAN ONE INPUT SAMPLES")
+                allSample = ", ".join(sampleId)
+                logger.warning(f"MORE THAN ONE INPUT SAMPLES: {allSample}")
+                sampleId = sampleId.pop()
+                logger.warning(f"The prefix will change to {sampleId}")
             else:
                 sampleId = sampleId.pop()
 
             i = 0
             formatGzUseThreadContents = []
-            for tempSingleSplitedR1Path, tempSingleSplitedR2Path in zip(tempAllSplitedR1Path, tempAllSplitedR2Path):
+            for tempSingleSplitedR1Path, tempSingleSplitedR2Path in zip(
+                tempAllSplitedR1Path, tempAllSplitedR2Path
+            ):
                 i += 1
                 if formatGz:
-                    sh.mv(tempSingleSplitedR1Path, f'{fastqTemp}{sampleId}_L{i:03}_R1_001.fastq.gz')
-                    sh.mv(tempSingleSplitedR2Path, f'{fastqTemp}{sampleId}_L{i:03}_R2_001.fastq.gz')
-                    formatGzUseThreadContents.append(sh.gzip('-d', f'{fastqTemp}{sampleId}_L{i:03}_R1_001.fastq.gz', _bg=True))
-                    formatGzUseThreadContents.append(sh.gzip('-d', f'{fastqTemp}{sampleId}_L{i:03}_R2_001.fastq.gz', _bg=True))
+                    sh.mv(
+                        tempSingleSplitedR1Path,
+                        f"{fastqTemp}{sampleId}_L{i:03}_R1_001.fastq.gz",
+                    )
+                    sh.mv(
+                        tempSingleSplitedR2Path,
+                        f"{fastqTemp}{sampleId}_L{i:03}_R2_001.fastq.gz",
+                    )
+                    formatGzUseThreadContents.append(
+                        sh.gzip(
+                            "-d",
+                            f"{fastqTemp}{sampleId}_L{i:03}_R1_001.fastq.gz",
+                            _bg=True,
+                        )
+                    )
+                    formatGzUseThreadContents.append(
+                        sh.gzip(
+                            "-d",
+                            f"{fastqTemp}{sampleId}_L{i:03}_R2_001.fastq.gz",
+                            _bg=True,
+                        )
+                    )
                 else:
-                    sh.mv(tempSingleSplitedR1Path, f'{fastqTemp}{sampleId}_L{i:03}_R1_001.fastq')
-                    sh.mv(tempSingleSplitedR2Path, f'{fastqTemp}{sampleId}_L{i:03}_R2_001.fastq')
+                    sh.mv(
+                        tempSingleSplitedR1Path,
+                        f"{fastqTemp}{sampleId}_L{i:03}_R1_001.fastq",
+                    )
+                    sh.mv(
+                        tempSingleSplitedR2Path,
+                        f"{fastqTemp}{sampleId}_L{i:03}_R2_001.fastq",
+                    )
             if formatGz:
                 [x.wait() for x in formatGzUseThreadContents]
 
-            for singleTempDir in glob.glob(f'{fastqTemp}*/'):
+            for singleTempDir in glob.glob(f"{fastqTemp}*/"):
                 sh.rmdir(singleTempDir)
 
-            allR1Path = glob.glob(f'{fastqTemp}*R1*')
-            allR2Path = [x.replace('R1', 'R2') for x in allR1Path]
-        
-    
+            allR1Path = glob.glob(f"{fastqTemp}*R1*")
+            allR2Path = [x.replace("R1", "R2") for x in allR1Path]
+
     allSubProcess = []
     with multiP(threads) as mP:
         for singleR1Path, singleR2Path in zip(allR1Path, allR2Path):
-            allSubProcess.append(mP.submit(processOneFastq, singleR1Path, singleR2Path, lmdbPath, outDir, cutoff))
+            allSubProcess.append(
+                mP.submit(
+                    processOneFastq,
+                    singleR1Path,
+                    singleR2Path,
+                    lmdbPath,
+                    outDir,
+                    cutoff,
+                )
+            )
     [x.result() for x in allSubProcess]
-    
+
     if not splitInput:
         pass
     else:
-        sh.rm('-rf', fastqTemp)
+        sh.rm("-rf", fastqTemp)
 
-def extractExonBases(bamPath, tempDir, threads, picardPath, bedAnnoPath, bufferSize, fastqDir, outDir, cutoff, splitInput=True):
+
+def extractExonBases(
+    bamPath,
+    tempDir,
+    threads,
+    picardPath,
+    bedAnnoPath,
+    bufferSize,
+    fastqDir,
+    outDir,
+    cutoff,
+    splitInput=True,
+):
     try:
         sh.mkdir(tempDir)
     except:
-        logger.warning('{tempDir} existed')
+        logger.warning("{tempDir} existed")
 
     ### split bam
-    logger.info('split bam start')
-    splitedDir = f'{tempDir}splitedDir/'
+    logger.info("split bam start")
+    splitedDir = f"{tempDir}splitedDir/"
     splitedCounts = threads
     splitBam(bamPath, splitedDir, splitedCounts, picardPath)
-    logger.info('split bam end')
+    logger.info("split bam end")
 
     ### get overlap region
-    logger.info('get overlap region and generate lmdb database start')
-    tsvPath = f'{tempDir}overlapRegion.tsv'
+    logger.info("get overlap region and generate lmdb database start")
+    tsvPath = f"{tempDir}overlapRegion.tsv"
     getOverlapInfo(splitedDir, tsvPath, threads, bedAnnoPath, bufferSize)
-    logger.info('get overlap region and generate lmdb database end')
+    logger.info("get overlap region and generate lmdb database end")
 
     ### parse overlap region
-    logger.info('parse temp file start')
-    lmdbPath = f'{tempDir}overlapRegionLmdb/'
+    logger.info("parse temp file start")
+    lmdbPath = f"{tempDir}overlapRegionLmdb/"
     getUsefulRegion(tsvPath, lmdbPath, threads)
-    logger.info('parse temp file end')
+    logger.info("parse temp file end")
 
     ### extract seq
-    logger.info('extract exon base start')
+    logger.info("extract exon base start")
     extractSeq(fastqDir, outDir, lmdbPath, threads, splitInput, cutoff)
-    logger.info('extract exon base end')
+    logger.info("extract exon base end")
 
+    ### start empty temp files
+    sh.rm("-rf", tempDir)
