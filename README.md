@@ -31,7 +31,7 @@ Commands:
   generateNanoporeWindow        output nanopore reads based on mapping info
   getMismatch                   calculate mismatch based on blast results
   getSpliceInfo                 get splice information which used for...
-  multilayerClustering          In short, we first separately calculate...
+  multilayerClustering          cluster nuclei by snf or mofa
   parseIllumina                 parse Illumina bam file and generate...
   polishReads                   polish barcode assigned Nanopore reads
   polyAClusterDetected          detect PolyA Cluster
@@ -47,12 +47,15 @@ Commands:
   - scanpy 
   - joblib 
   - loguru 
-  - portaion 
+  - portion 
   - ont-fast5-api 
   - more_itertools
   - biopython
   - pyfastx
   - snfpy
+  - mofapy2
+- R
+  - scran
 - Snakemake 
 - minimap2 
 - poaV2 
