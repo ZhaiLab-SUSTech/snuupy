@@ -485,32 +485,29 @@ def _generateMtx(
 
 @main.command("multilayerClustering")
 @click.option('--mtx', 'multiMatPath', required=True)
-@click.option('--gene', 'useGenePath')
 @click.option('-o', 'outPath', required=True)
-def _multilayerClustering(multiMatPath, useGenePath, outPath):
+@click.option('--method', 'method', type=click.Choice(['snf', 'mofa']), required=True)
+def _multilayerClustering(multiMatPath, outPath, method):
     """
-    In short, we first separately calculate euclidean mat for dimension reduced gene expression mat, APA mat and spliced mat.
-    then use SNF method fusion these matrices, the resulting mat can be load to clustering algorithms, such as leiden.
-    This method is inspired by scLAPA (https://github.com/BMILAB/scLAPA)
-
     \b
-    we have not verified this method and it is a pre-release version.
-
+    SNF:
+        In short, we first separately calculate euclidean mat for dimension reduced gene expression mat, APA mat and spliced mat.
+        then use SNF method fusion these matrices, the resulting mat can be load to clustering algorithms, such as leiden.
+        This method is inspired by scLAPA (https://github.com/BMILAB/scLAPA)
+        we have not verified this method and it is a pre-release version.
     \b
+    MOFA:
+        In short, we use MOFA+ (https://biofam.github.io/MOFA2) method to APA, Splice and abundance matrix .
+    \b
+    method:
+        snf|mofa
     multiMatPath:
         multilayer mat path
-    useGenePath:
-        gene used for calculating correlation matrix. if not provided, all gene will be used. NO HEADER, NO INDEX
-        e.g:
-            AT1G01010
-            AT1G01020
-            AT1G01030
     outPath:
-        prefix of output file containing fused connectivities matrix and leiden clustering result.
-        matrix: fused eulidean mat npy format, could be loaded by numpy.load function
+        prefix of output file containing fused connectivities matrix(snf only), mofa results (mofa only) and leiden clustering result.
     """
     from scripts.multilayerClustering import main as multiCluster
-    multiCluster(multiMatPath, useGenePath, outPath)
+    multiCluster(multiMatPath, outPath, method)
 
 
 main()

@@ -324,7 +324,7 @@ def extract_read_data(fast5_filepath, read_id):
                 {"move": move, "start": start_col, "move_cumsum": np.cumsum(move)}
             )
             event_data["model_state"] = event_data["move_cumsum"].map(
-                lambda x: fastq[x - 1 : x]
+                lambda x: fastq[x - 1: x]
             )
             called_events = len(event_data)
 
@@ -371,7 +371,7 @@ def multfunc_dtframe(func, data, threading, use_iter=False, use_threading=False,
         pool = Pool(threading)
         span = (len(data) // threading) + 1
         for _ in range(threading):
-            sub_data = data.iloc[_ * span : (_ + 1) * span]
+            sub_data = data.iloc[_ * span: (_ + 1) * span]
             result.append(pool.apply_async(func, args=(sub_data, *args)))
         pool.close()
         pool.join()
@@ -388,7 +388,7 @@ def multfunc_dtframe(func, data, threading, use_iter=False, use_threading=False,
             else:
                 span = (len(chunk_data) // (threading - 1)) + 1
                 for _ in range(threading - 1):
-                    sub_data = chunk_data.iloc[_ * span : (_ + 1) * span]
+                    sub_data = chunk_data.iloc[_ * span: (_ + 1) * span]
                     if not sub_data.empty:
                         latter_chunk_result.append(
                             pool.apply_async(func, args=(sub_data, *args))
@@ -511,7 +511,7 @@ def updateOldMultiAd(adata):
             subIndex = adata.var.index.str.contains(keyword)
         subAd = adata[:, subIndex]
         adata.obsm[keyword] = subAd.X
-        adata.uns[f"{keyword}_label"] = subAd.var.index
+        adata.uns[f"{keyword}_label"] = subAd.var.index.values
 
     __addMatToObsm(adata, "APA")
     __addMatToObsm(adata, "Spliced")
@@ -520,25 +520,48 @@ def updateOldMultiAd(adata):
     return adata
 
 
-def getMatFromObsm(adata, keyword, useGeneLs=[], normalize=True, logScale=True, ignoreN=False, clear=False):
+def getMatFromObsm(
+    adata,
+    keyword,
+    minCell=5,
+    useGeneLs=[],
+    normalize=True,
+    logScale=True,
+    ignoreN=False,
+    clear=False,
+    raw=False,
+    strCommand=None,
+):
     """
     use MAT deposited in obsm replace the X MAT
 
     params:
         adata:
             version 1.0 multiAd
-        keyword: 
+        keyword:
             stored in obsm
+        minCell:
+            filter feature which expressed not more than <minCell> cells
         useGeneLs:
             if not specified useGeneLs, all features will be output, otherwise only features associated with those gene will be output
         normalize:
             normalize the obtained Mtx or not
-        logScale: 
+        logScale:
             log-transformed or not
         ignoreN:
             ignore ambiguous APA/Splice info
         clear:
             data not stored in obs or var will be removed
+        raw:
+            return the raw dataset stored in the obsm. This parameter is prior to all others
+        strCommand:
+            use str instead of specified params:
+            "n": set normalize True
+            "s": set logScale True
+            'N': set ignoreN True
+            'c' set clear True
+            '': means all is False
+            This parameter is prior to all others except raw
     return:
         anndata
     """
@@ -546,17 +569,38 @@ def getMatFromObsm(adata, keyword, useGeneLs=[], normalize=True, logScale=True, 
         transformedAd = anndata.AnnData(
             X=adata.obsm[keyword].copy(),
             obs=adata.obs,
-            var=adata.uns[f"{keyword}_label"].to_frame().drop(0, axis=1),
+            var=pd.DataFrame(index=adata.uns[f"{keyword}_label"]),
         )
     else:
         transformedAd = anndata.AnnData(
             X=adata.obsm[keyword].copy(),
             obs=adata.obs,
-            var=adata.uns[f"{keyword}_label"].to_frame().drop(0, axis=1),
+            var=pd.DataFrame(index=adata.uns[f"{keyword}_label"]),
             obsp=adata.obsp,
             obsm=adata.obsm,
             uns=adata.uns,
         )
+
+    if raw:
+        return transformedAd
+
+    if strCommand != None:
+        normalize = True if "n" in strCommand else False
+        logScale = True if "s" in strCommand else False
+        ignoreN = True if "N" in strCommand else False
+        clear = True if "c" in strCommand else False
+
+    logger.info(
+        f"""
+    final mode: 
+        normalize: {normalize}, 
+        logScale: {logScale}, 
+        ignoreN: {ignoreN}, 
+        clear: {clear}
+    """
+    )
+
+    sc.pp.filter_genes(transformedAd, min_cells=minCell)
 
     if normalize:
         sc.pp.normalize_total(transformedAd, target_sum=1e4)
@@ -572,11 +616,155 @@ def getMatFromObsm(adata, keyword, useGeneLs=[], normalize=True, logScale=True, 
             transformedAdFeatureSr.str.split("_").str[0].isin(useGeneLs)
         )
         transformedAd = transformedAd[:, transformedAdFeatureFilterBl]
-    
+
     if ignoreN:
         transformedAdFeatureSr = transformedAd.var.index
-        transformedAdFeatureFilterBl = ~transformedAdFeatureSr.str.split("_").str[1].isin(['N', 'Ambiguous'])
+        transformedAdFeatureFilterBl = (
+            ~transformedAdFeatureSr.str.split("_").str[1].isin(["N", "Ambiguous"])
+        )
 
         transformedAd = transformedAd[:, transformedAdFeatureFilterBl]
 
     return transformedAd
+
+
+def normalizeByScran(adata, logScaleOut=True):
+    """normalizeByScran: use scran normalize raw counts
+
+    Args:
+        adata (anndata): X stores raw counts
+        logScaleOut (bool, optional): log-transform the output or not. Defaults to True.
+
+    Returns:
+        anndata: raw counts is stored in layers['counts'] and X is updated by the normalized and log-transformed counts
+    """
+    from scipy.sparse import csr_matrix, isspmatrix
+    import rpy2.robjects as ro
+    from rpy2.robjects import pandas2ri
+
+    pandas2ri.activate()
+    ro.r("library(scran)")
+
+    adata = adata.copy()
+    adataPP = adata.copy()
+    sc.pp.normalize_per_cell(adataPP, counts_per_cell_after=1e6)
+    sc.pp.log1p(adataPP)
+    sc.pp.pca(adataPP, n_comps=20)
+    sc.pp.neighbors(adataPP)
+    sc.tl.leiden(adataPP, key_added="groups", resolution=0.7)
+    inputGroupDf = adataPP.obs["groups"]
+    dataMat = adata.X.T
+    if isspmatrix(dataMat):
+        dataMat = dataMat.A
+
+    ro.globalenv["inputGroupDf"] = inputGroupDf
+    ro.globalenv["dataMat"] = dataMat
+
+    sizeFactorSr = ro.r(
+        "sizeFactors(computeSumFactors(SingleCellExperiment(list(counts=dataMat)), clusters=inputGroupDf, min.mean=0.1))"
+    )
+
+    adata.obs["sizeFactors"] = sizeFactorSr
+    adata.layers["counts"] = adata.X.copy()
+    adata.X /= adata.obs["sizeFactors"].values.reshape([-1, 1])
+
+    if logScaleOut:
+        sc.pp.log1p(adata)
+
+    adata.X = csr_matrix(adata.X)
+    return adata
+
+
+def addDfToObsm(adata, copy=False, **dataDt):
+    """addDfToObsm, add data to adata.obsm
+
+    Args:
+        adata ([anndata])
+        copy (bool, optional)
+        dataDt: {label: dataframe}, dataframe must have the same
+
+    Returns:
+        adata if copy=True, otherwise None
+    """
+    adata = adata.copy() if copy else adata
+    for label, df in dataDt.items():
+        if (adata.obs.index != df.index).all():
+            logger.error(f"dataset {label} have a wrong shape/index")
+            0 / 0
+        adata.uns[f"{label}_label"] = df.columns.values
+        adata.obsm[label] = df.values
+    if copy:
+        return adata
+
+
+def creatAnndataFromDf(df, **layerInfoDt):
+    """
+    dataframe 2 anndata
+    df,
+    layerInfoDt:
+        key: layer name
+        value: mtx
+    same dimension
+    """
+    transformedAd = anndata.AnnData(
+        X=df.values,
+        obs=pd.DataFrame(index=df.index),
+        var=pd.DataFrame(index=df.columns),
+    )
+    for layerName, layerMtx in layerInfoDt.items():
+
+        transformedAd.layers[layerName] = layerMtx
+
+    return transformedAd
+
+
+def transformEntToAd(ent):
+    """transformEntToAd parse trained ent object to anndata
+
+    Args:
+        ent ([entry_point]): only one group
+
+    Returns:
+        anndata: the X represents the sample-factor weights,
+                 the layer represents the feature-factor weight and variance-factor matrix,
+                 the uns['mofaR2_total] stored the total variance of factors could be explained
+    """
+    factorOrderLs = np.argsort(
+        np.array(ent.model.calculate_variance_explained()).sum(axis=(0, 1))
+    )[::-1]
+
+    sampleWeightDf = pd.DataFrame(ent.model.getExpectations()["Z"]["E"]).T
+    sampleWeightDf = sampleWeightDf.reindex(factorOrderLs).reset_index(drop=True)
+    sampleWeightDf.index = [f"factor_{x}" for x in range(1, len(factorOrderLs) + 1)]
+    sampleWeightDf.columns = ent.data_opts["samples_names"][0]
+    mofaAd = creatAnndataFromDf(sampleWeightDf)
+
+    for label, featureSr, data in zip(
+        ent.data_opts["views_names"],
+        ent.data_opts["features_names"],
+        ent.model.getExpectations()["W"],
+    ):
+        df = pd.DataFrame(data["E"]).T
+        featureSr = pd.Series(featureSr)
+        featureSr = featureSr.str.rstrip(label)
+        if label in ["APA", "fullySpliced"]:
+            featureSr = featureSr + label
+        df.columns = featureSr
+        df = df.reindex(factorOrderLs).reset_index(drop=True)
+        df.index = [f"factor_{x}" for x in range(1, len(factorOrderLs) + 1)]
+        addDfToObsm(mofaAd, **{label: df})
+
+    r2Df = pd.DataFrame(ent.model.calculate_variance_explained()[0]).T
+    r2Df = r2Df.reindex(factorOrderLs).reset_index(drop=True)
+    r2Df.index = [f"factor_{x}" for x in range(1, len(factorOrderLs) + 1)]
+    r2Df.columns = ent.data_opts["views_names"]
+    addDfToObsm(mofaAd, mofaR2=r2Df)
+
+    mofaAd.uns["mofaR2_total"] = {
+        x: y
+        for x, y in zip(
+            ent.data_opts["views_names"],
+            ent.model.calculate_variance_explained(True)[0],
+        )
+    }
+    return mofaAd
