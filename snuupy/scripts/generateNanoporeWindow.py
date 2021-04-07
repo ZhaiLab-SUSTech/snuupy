@@ -30,8 +30,9 @@ def parseOneReadToWindow(read, window, upperLimit, outputPath):
     if windowStart != 0:
         windowStart -= 1
     if windowEnd != upperLimit:
-        windowEnd != 1
+        windowEnd += 1
 
+    windowLs = list(set([windowStart, windowStart+1, windowStart+2, windowEnd-2, windowEnd-1, windowEnd]))
     unmappedBaseE, unmappedBaseLengthE = read.get_tag('ES'), read.get_tag('EL')
     unmappedBaseF, unmappedBaseLengthF = read.get_tag('FS'), read.get_tag('FL')
     nameE = f'{name}_e_{unmappedBaseLengthE}'
@@ -39,11 +40,10 @@ def parseOneReadToWindow(read, window, upperLimit, outputPath):
     contentE = f'>{nameE}\n{unmappedBaseE}\n'
     contentF = f'>{nameF}\n{unmappedBaseF}\n'
     content = contentF + contentE
-    for window in range(windowStart, windowEnd+1):
+    for window in windowLs:
         windowPath = f'{outputPath}{window}.fa'
         with open(windowPath,'a') as fh:
             fh.write(content)
-
 
 def parseOneChr(bamChrFetch, window, upperLimit, outputPath):
     os.mkdir(outputPath)   
