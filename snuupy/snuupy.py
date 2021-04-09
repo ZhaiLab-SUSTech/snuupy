@@ -17,7 +17,7 @@ def main():
 @click.option(
     "--genomeCounts",
     "useColumn",
-    default=5,
+    default=100,
     type=int,
     show_default=True,
     help="chromosome counts",
@@ -123,7 +123,9 @@ def _generateIlluminaWindowFromKb(
 @click.option("-i", "BAM_PATH", help="minimap2 output; bam format")
 @click.option("-f", "NANOPORE_FASTA", help="raw nanopore seq; fasta format")
 @click.option("-o", "BAM_PATH_OUT", help="output bam")
-@click.option("--in-disk", "IN_DISK", is_flag=True, help="store sequences on disk instead of mem")
+@click.option(
+    "--in-disk", "IN_DISK", is_flag=True, help="store sequences on disk instead of mem"
+)
 def _addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK):
     """
     \b
@@ -208,29 +210,23 @@ def _barcodeAssignment(MISMATCH_RESULT, OUTPUT_FEATHER, MAX_BARCODE_ED, MAX_UMI_
 
 
 @main.command("polishReads")
-@click.option("-i", "MISMATCH_RESULT", help="step07 output")
-@click.option("-f", "NANOPORE_READ", help="original nanopore read")
-@click.option("-T", "TEMP_DIR", help="temp dir; end with /")
-@click.option("-F", "FINAL_DIR", help="polished read stored dir; end with /")
-@click.option("-o", "POLISHED_READ", help="polished read")
-@click.option("-p", "PENALTY_PATH", help="penalty matrix used by poa")
-@click.option("-t", "THREADS", type=int, help="threads")
-@click.option("--minimap2", "minimapPath", show_default=True, default="minimap2")
-@click.option("--poa", "poaPath", default="poa", show_default=True)
+@click.option("-i", "barcodeAssignedPath", help="barcodeAssignment output")
+@click.option("-f", "nanoporeFaPath", help="original nanopore read; fasta format")
+@click.option("-T", "tempResultsDir", help="temp dir; end with /")
+@click.option("-F", "finalResultsDir", help="polished read stored dir; end with /")
+@click.option("-o", "polishedRead", help="polished read")
+@click.option("-t", "threads", type=int, help="threads")
 @click.option("--racon", "raconPath", default="racon", show_default=True)
 @click.option("--seqkit", "seqkitPath", default="seqkit", show_default=True)
 def _polishReads(
-    MISMATCH_RESULT,
-    NANOPORE_READ,
-    TEMP_DIR,
-    FINAL_DIR,
-    POLISHED_READ,
-    THREADS,
-    PENALTY_PATH,
-    minimapPath,
-    poaPath,
+    barcodeAssignedPath,
     raconPath,
     seqkitPath,
+    nanoporeFaPath,
+    tempResultsDir,
+    finalResultsDir,
+    threads,
+    polishedRead,
 ):
     """
     polish barcode assigned Nanopore reads
@@ -238,17 +234,14 @@ def _polishReads(
     from scripts.polishReads import polishReads
 
     polishReads(
-        MISMATCH_RESULT,
-        NANOPORE_READ,
-        TEMP_DIR,
-        FINAL_DIR,
-        POLISHED_READ,
-        THREADS,
-        PENALTY_PATH,
-        minimapPath,
-        poaPath,
+        barcodeAssignedPath,
         raconPath,
         seqkitPath,
+        nanoporeFaPath,
+        tempResultsDir,
+        finalResultsDir,
+        threads,
+        polishedRead,
     )
 
 
@@ -483,10 +476,11 @@ def _generateMtx(
         onlyFullLength,
     )
 
+
 @main.command("multilayerClustering")
-@click.option('--mtx', 'multiMatPath', required=True)
-@click.option('-o', 'outPath', required=True)
-@click.option('--method', 'method', type=click.Choice(['snf', 'mofa']), required=True)
+@click.option("--mtx", "multiMatPath", required=True)
+@click.option("-o", "outPath", required=True)
+@click.option("--method", "method", type=click.Choice(["snf", "mofa"]), required=True)
 def _multilayerClustering(multiMatPath, outPath, method):
     """
     \b
@@ -507,6 +501,7 @@ def _multilayerClustering(multiMatPath, outPath, method):
         prefix of output file containing fused connectivities matrix(snf only), mofa results (mofa only) and leiden clustering result.
     """
     from scripts.multilayerClustering import main as multiCluster
+
     multiCluster(multiMatPath, outPath, method)
 
 

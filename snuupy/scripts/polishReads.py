@@ -1,171 +1,167 @@
 import pandas as pd
 import numpy as np
-import time
-import pyfastx
-import copy
 import os
 from loguru import logger
-from concurrent.futures import ProcessPoolExecutor
-from more_itertools import chunked
 from itertools import repeat
-from .tools import readFasta
+import typing
+from more_itertools import chunked
+from concurrent.futures import ProcessPoolExecutor
+import pyabpoa as poa
+import mappy as mm
+import time
+from .tools import FastaContent, writeFasta
 
 
-def GetConsensusSeq():
-    
-    seq2numDict = {
-    '-':4,
-    'A':0,
-    'T':1,
-    'G':2,
-    'C':3
-}
-    num2seqDict = {i:j for j,i in seq2numDict.items()}
-    
-    def _getMaxCountElement(Array):
-        return np.argmax(np.bincount(Array))
-    
-    def _getConsensusSeq(alignedFasta):
-        seqList = []
-        fastaAligned = readFasta(alignedFasta)
-        for x in fastaAligned:
-            seqList.append([seq2numDict[x] for x in list(x.seq)])
-        seqArray = np.array(seqList)
-        consensusSeq = np.apply_along_axis(_getMaxCountElement, 0, seqArray)
-        consensusSeq = consensusSeq[consensusSeq != 4]
-        consensusSeq = ''.join([num2seqDict[x] for x in consensusSeq])
-        return consensusSeq
-    
-    return _getConsensusSeq
+def consensusByPoa(readLs, umi, outputPath, readCounts) -> str:
+    seqLs = [x.seq for x in readLs]
+    poaAligner = poa.msa_aligner(match=5)
+    poaRes = poaAligner.msa(seqLs, out_cons=True, out_msa=False)
+    poaConsSeq = poaRes.cons_seq[0]
+    with open(outputPath, "w") as fh:
+        print(f">{umi}_{readCounts}\n{poaConsSeq}", file=fh)
+    return poaConsSeq
 
 
-def getConsensesFasta(readLs, tempPath, penaltyPath, poaPath, finalPath=False):
-    getConsensusSeq = GetConsensusSeq()
-    
-    with open(f'{tempPath}_all.fa', 'w') as fh:
-        for read in readLs[:10]:
-            fh.write(f'>{read[0]}\n{read[1]}\n')
-    
-    os.system(f'{poaPath} -read_fasta {tempPath}_all.fa -pir {tempPath}_all.aln {penaltyPath}')
-    
-    
-    consensusSeq = getConsensusSeq(f'{tempPath}_all.aln')
-    
-    readName = tempPath.split('/')[-1]
-    if not finalPath:
-        finalPath = f'{tempPath}_round0.fa'
+def mappingByMinimap2(consSeq, readLs, umi, outputPath, readCounts) -> None:
+    mmAlign = mm.Aligner(seq=consSeq, preset="map-ont")
+    with open(outputPath, "w") as fh:
+        for read in readLs:
+            for hit in mmAlign.map(read.seq):
+                print(
+                    f"{read.name}\t{len(read.seq)}\t{hit.q_st}\t{hit.q_en}\t{hit.strand}\t{umi}_{readCounts}\t{hit.ctg_len}\t{hit.r_st}\t{hit.r_en}\t{hit.mlen}\t{hit.blen}\t{hit.mapq}",
+                    file=fh,
+                )
 
-    with open(finalPath, 'w') as fh:
-        fh.write(f'>{readName}_{len(readLs)}\n{consensusSeq}\n')
-    
-#     os.system(f'rm {tempPath}*')
 
-def getPolishRead(tempPath, finalPath, minimapPath, raconPath, times=1):
-    def _getPolishCommand(commandExecuted, targetFasta, useFasta, polishedFasta):
-        # commandExecuted += f'bwa index -a is {targetFasta} && bwa mem {targetFasta} {useFasta} > {targetFasta}.sam && racon {useFasta} {targetFasta}.sam {targetFasta} > {polishedFasta} &&'
-        commandExecuted += f'{minimapPath} --secondary=no -ax map-ont {targetFasta} {useFasta} > {targetFasta}.sam && {raconPath} {useFasta} {targetFasta}.sam {targetFasta} > {polishedFasta} &&'
-        return commandExecuted.strip()
-    
-    
-    allPolishedPath = [tempPath + f'_round{x}.fa' for x in range(times + 1)]
-    commandExecuted = '('
-    for x in range(times):
-        commandExecuted = _getPolishCommand(commandExecuted, allPolishedPath[x], f'{tempPath}_all.fa', allPolishedPath[x+1])
-        
-    commandExecuted += f'mv {allPolishedPath[x+1]} {finalPath} && rm {tempPath}* )'
-    commandExecuted = commandExecuted.strip()
-    return commandExecuted
+def processOneUmi(
+    umiWithReadId: typing.Tuple[str, typing.List[str]],
+    nanoporeReadContent: FastaContent,
+    tempDirPath: str,
+    finalDirPath: str,
+    raconPath: str,
+) -> str:
+    umi, readIdWithStrandLs = umiWithReadId
+    readCounts = len(readIdWithStrandLs)
 
-def polishSeq(barcodeWithReadLs, nanoporeDict, tempDirPath, finalDirPath, penaltyPath, minimapPath, poaPath, raconPath):
-    barcodeWithReadLs = copy.deepcopy(barcodeWithReadLs)
-    barcode, readLs = barcodeWithReadLs
-    finalPath = f'{finalDirPath}{barcode}.fa'
-    returnList = [barcode, readLs]
-    lengthList = []
-    for read in readLs:
-        readName, readStrand = read[0].split('_')
-        if readStrand == '1':
-            readSeq = nanoporeDict[readName].antisense
-            seqLength = len(readSeq)
+    readIdLs = ["_".join(x.split("_")[:-1]) for x in readIdWithStrandLs]
+    readStrandLs = [x.split("_")[-1] for x in readIdWithStrandLs]
+    readLs = []
+    for readId, readStrand in zip(readIdLs, readStrandLs):
+        if readStrand == "1":
+            readLs.append(nanoporeReadContent[readId].getAnti())
+        elif readStrand == "0":
+            readLs.append(nanoporeReadContent[readId])
         else:
-            readSeq = nanoporeDict[readName].seq
-            seqLength = len(readSeq)
-        lengthList.append(seqLength)
-        read.extend([readSeq])
+            logger.error(f"can't identify strand information of {readId}")
 
-    if len(readLs) <= 2:
-#         print(barcode,lengthList)
-        lengthMinIndex = lengthList.index(max(lengthList))
-        referenceRead = readLs.pop(lengthMinIndex)
-        read = referenceRead
-        with open(finalPath, 'w') as fh:
-            fh.write(f'>{barcode}_{len(readLs) + 1}\n{read[1]}\n')
-        return '(echo "no need")'
+    readFinalOutputPath = f"{finalDirPath}{umi}_{readCounts}.final.fa"
+    umiAllReadPath = f"{tempDirPath}{umi}_all.fa"
 
+    if readCounts == 1:
+        read = readLs[0]
+        read.name = f"{umi}_{readCounts}"
+        with open(readFinalOutputPath, "w") as fh:
+            writeFasta(readLs[0], fh)
+        cmdStr = 'echo ""'
     else:
-        tempReadPath = f'{tempDirPath}{barcode}'
-        
-        getConsensesFasta(readLs, tempReadPath, penaltyPath, poaPath)
-        return getPolishRead(tempReadPath, finalPath,  minimapPath, raconPath)
+        readLs = readLs[:10]
+        with open(umiAllReadPath, "w") as fh:
+            for read in readLs:
+                writeFasta(read, fh)
 
-def chunkPolishSeq(chunkBarcodeWithReadIter, nanoporeReadPath, tempDirPath, finalDirPath, penaltyPath, i, minimapPath, poaPath, raconPath):
-    nanoporeRead = pyfastx.Fasta(nanoporeReadPath)
-    commandExecuted = list(map(polishSeq, chunkBarcodeWithReadIter, repeat(nanoporeRead), repeat(tempDirPath), repeat(finalDirPath), repeat(penaltyPath), repeat(minimapPath), repeat(poaPath), repeat(raconPath)))
-    commandExecuted = ' ;\\\n'.join(commandExecuted)
-    os.system(commandExecuted)
-    if i % 100 == 0 :
-        logger.info(f'{i*100} reads processed')
+        poaConsusReadPath = f"{tempDirPath}{umi}_{readCounts}_poa.fa"
+        poaConsSeq = consensusByPoa(readLs, umi, poaConsusReadPath, readCounts)
 
+        minimapPafPath = f"{tempDirPath}{umi}_{readCounts}_minimap2.paf"
+        mappingByMinimap2(poaConsSeq, readLs, umi, minimapPafPath, readCounts)
+        raconReadPath = f"{tempDirPath}{umi}_{readCounts}_racon.fa"
+
+        cmdStr = f"{raconPath} {umiAllReadPath} {minimapPafPath} {poaConsusReadPath} > {raconReadPath} 2>/dev/null &&\
+            mv {raconReadPath} {readFinalOutputPath} &&\
+            rm {umiAllReadPath} {minimapPafPath} {poaConsusReadPath}"
+
+    return cmdStr
+
+
+def processOneChunk(
+    umiWithReadIdLs: typing.Sequence[typing.Tuple[str, typing.List[str]]],
+    nanoporeFaPath: str,
+    tempDirPath: str,
+    finalDirPath: str,
+    raconPath: str,
+    i: int,
+    totalUmiCounts:int
+) -> None:
+    nanoporeReadFastaContent = FastaContent(nanoporeFaPath, True)
+    commandExecutedCmdLs = []
+    for umiWithReadId in umiWithReadIdLs:
+        try:
+            commandExecutedCmdLs.append(processOneUmi(umiWithReadId, nanoporeReadFastaContent, tempDirPath, finalDirPath, raconPath))
+        except:
+            logger.warning(f"detect error when process {umiWithReadId[0]}")
+    commandExecutedCmd = " ;\\\n".join(commandExecutedCmdLs)
+    os.system(commandExecutedCmd)
+    logger.info(f"{i*64} UMIs processed; total {totalUmiCounts}")
 
 
 def polishReads(
-    MISMATCH_RESULT,
-    NANOPORE_READ,
-    TEMP_DIR,
-    FINAL_DIR,
-    POLISHED_READ,
-    THREADS,
-    PENALTY_PATH,
-    minimapPath,
-    poaPath,
+    barcodeAssignedPath,
     raconPath,
-    seqkitPath
-):  
-    if os.path.exists(TEMP_DIR):
-        logger.warning(f"{TEMP_DIR} existed!!")
-    else:
-        os.mkdir(TEMP_DIR)
-    if os.path.exists(FINAL_DIR):
-        logger.warning(f"{FINAL_DIR} existed!!")
-    else:
-        os.mkdir(FINAL_DIR)
+    seqkitPath,
+    nanoporeFaPath,
+    tempResultsDir,
+    finalResultsDir,
+    threads,
+    polishedRead,
+):
+    if not os.path.exists(tempResultsDir):
+        os.mkdir(tempResultsDir)
+    if not os.path.exists(finalResultsDir):
+        os.mkdir(finalResultsDir)
 
-    logger.info('read mismatch results')
-    mismatchResult = pd.read_feather(MISMATCH_RESULT)
-    logger.info('prepare for polish')
-    mismatchResult["readStrand"] = (
-        mismatchResult["readStrand"] ^ mismatchResult["umiStrand"]
+    logger.info('start build fasta lmda database')
+    fastaContent = FastaContent(nanoporeFaPath, True) # ensure lmdb database of fasta is built
+
+    logger.info('start parse barcodeAssigned result')
+    barcodeAssignedDf = pd.read_feather(barcodeAssignedPath)
+
+    barcodeAssignedDf["readStrand"] = (
+        barcodeAssignedDf["readStrand"] ^ barcodeAssignedDf["umiStrand"]
+    ).astype(str)
+    barcodeAssignedDf.drop("umiStrand", axis=1, inplace=True)
+    barcodeAssignedDf["temp"] = (
+        barcodeAssignedDf["name"] + "_" + barcodeAssignedDf["readStrand"]
     )
-    mismatchResult.drop("umiStrand", axis=1, inplace=True)
-    mismatchResult["readStrand"] = mismatchResult["readStrand"].astype(str)
-    mismatchResult["temp"] = mismatchResult["name"] + "_" + mismatchResult["readStrand"]
-    sameUmiReadDt = mismatchResult.groupby("qseqid")["temp"].agg(lambda x: list(x))
-    sameUmiReadDc = {i: [[k] for k in j] for i, j in sameUmiReadDt.items()}
+    sameUmiReadDt = (
+        barcodeAssignedDf.groupby("qseqid")["temp"].agg(lambda x: list(x)).to_dict()
+    )
+
     logger.info('start polish')
-    umiReadDcIter = chunked(sameUmiReadDc.items(), 100)
-    i = 0
+    totalUmiCounts = len(sameUmiReadDt)
+    umiWithReadIdLsIter = chunked(sameUmiReadDt.items(), 64)
     allResults = []
-    with ProcessPoolExecutor(THREADS) as multiP:
-        for umiReadDtChunk in umiReadDcIter:
-            i += 1
-            allResults.append(multiP.submit(chunkPolishSeq, umiReadDtChunk, NANOPORE_READ, TEMP_DIR, FINAL_DIR, PENALTY_PATH, i, minimapPath, poaPath, raconPath))
+    with ProcessPoolExecutor(threads) as multiP:
+        for i, umiWithReadIdLs in enumerate(umiWithReadIdLsIter):
+            allResults.append(
+                multiP.submit(
+                    processOneChunk,
+                    umiWithReadIdLs,
+                    nanoporeFaPath,
+                    tempResultsDir,
+                    finalResultsDir,
+                    raconPath,
+                    i,
+                    totalUmiCounts
+                )
+            )
     [x.result() for x in allResults]
-    logger.info('merge all polished reads')
+
+    logger.info("merge all polished reads")
     time.sleep(10)
     os.system(
         f"""
-    cat {FINAL_DIR}* | {seqkitPath} seq -rp > {POLISHED_READ} && sleep 15 &&\
-    rm -rf {FINAL_DIR} &&\
-    rm -rf {TEMP_DIR}
+    cat {finalResultsDir}* | {seqkitPath} seq -rp > {polishedRead} && sleep 15 &&\
+    rm -rf {finalResultsDir} &&\
+    rm -rf {tempResultsDir}
     """
     )

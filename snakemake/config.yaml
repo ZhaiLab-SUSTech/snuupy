@@ -34,12 +34,8 @@ seqkitPath:
   '/public/home/liuzj/softwares/anaconda3/bin/seqkit'
 blastPath:
   '/public/home/liuzj/softwares/blast/ncbi-blast-2.10.0+/bin/'
-poaPath:
-  '/public/home/liuzj/softwares/poaV2/poa'
 raconPath:
   '/public/home/liuzj/softwares/racon/build/bin/racon'
-penaltyMatPath:
-  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/blosum80.mat'
 bedtoolsPath:
   '/public/home/liuzj/softwares/anaconda3/bin/bedtools'
 
@@ -47,7 +43,7 @@ bedtoolsPath:
 
 #cellranger configs
 runCellRangerConfig:
-  '/public/home/liuzj/publicPipeline/snuupy/removeExonRegion/cellRangerParameter.yaml'
+  '/public/home/liuzj/github/snuupy/removeExonRegion/cellRangerParameter.yaml'
 
 #reads path
 illuminaFastqs:

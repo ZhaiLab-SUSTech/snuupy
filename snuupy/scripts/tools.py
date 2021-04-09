@@ -129,57 +129,52 @@ class Fasta:
     def getAnti(self):
         return Fasta(self.name, getAntisense(self.seq))
 
+def writeFasta(read, fh):
+    readContent = f">{read.name}\n{read.seq}\n"
+    fh.write(readContent)
 
 class FastaContent:
-    """
-    fasta content
-    """
 
     def __init__(self, path, useIndex=False):
         self.path = path
         self.useIndex = useIndex
         if self.useIndex:
-            self.indexPath = f"{self.path}_lmdb/"
+            self.indexPath = f'{self.path}_lmdb/'
             if os.path.exists(self.indexPath):
                 pass
             else:
                 self.buildIndex()
-            self.lmdbEnv = lmdb.Environment(self.indexPath)
+            self.lmdbEnv = lmdb.Environment(self.indexPath, max_readers=1024, readonly=True)
             self.lmdbTxn = self.lmdbEnv.begin()
-            self.keys = pickle.loads(self.lmdbTxn.get("thisFileIndex".encode()))
-            self.__keySt = set(self.keys)
+            self.keys = None
 
     def __len__(self):
         if not self.useIndex:
             logger.error(f"NO Index mode!")
             0 / 0
         else:
+            if not self.keys:
+                self.keys = pickle.loads(self.lmdbTxn.get("thisFileIndex".encode()))
             return len(self.keys)
 
     def __getitem__(self, readName):
         if not self.useIndex:
             logger.error(f"NO Index mode!")
             0 / 0
-        elif readName not in self.__keySt:
-            logger.error(f"NOT Found Read name!")
-            0 / 0
+        # elif readName not in self.__keySt:
+        #     logger.error(f"NOT Found Read name!")
+        #     0 / 0
         else:
             return self.__readFastaReadFromLmdb(readName)
 
     def buildIndex(self):
-        """
-        build lmdb database
-        """
 
         def __writeFastaReadToLmdb(lmdbTxn, fastaRead):
-            lmdbTxn.put(
-                key=f"{fastaRead.name}_name".encode(), value=fastaRead.name.encode()
-            )
-            lmdbTxn.put(
-                key=f"{fastaRead.name}_seq".encode(), value=fastaRead.seq.encode()
-            )
+            lmdbTxn.put(key=f"{fastaRead.name}_name".encode(), value=fastaRead.name.encode())
+            lmdbTxn.put(key=f"{fastaRead.name}_seq".encode(), value=fastaRead.seq.encode())
+            
 
-        lmdbEnv = lmdb.open(self.indexPath, map_size=1099511627776)
+        lmdbEnv = lmdb.open(self.indexPath, map_size=1099511627776, max_readers=1024)
         lmdbTxn = lmdbEnv.begin(write=True)
         readNameLs = []
         for i, fastaRead in enumerate(self.__readFasta()):
@@ -193,9 +188,6 @@ class FastaContent:
         lmdbEnv.close()
 
     def __readFasta(self):
-        """
-        read fasta file
-        """
         with open(self.path, "r") as fh:
             i = 0
             while True:
@@ -217,10 +209,7 @@ class FastaContent:
             read = Fasta(name=readName, seq=readSeq)
             yield read
 
-    def __readFastaReadFromLmdb(self, readName):
-        """
-        read fasta form lmdb
-        """
+    def __readFastaReadFromLmdb(self,readName):
         read = Fasta(
             name=self.lmdbTxn.get(f"{readName}_name".encode()).decode(),
             seq=self.lmdbTxn.get(f"{readName}_seq".encode()).decode(),
@@ -228,21 +217,17 @@ class FastaContent:
         return read
 
     def __readLmdb(self):
-        """
-        read lmdb file
-        """
+        if not self.keys:
+            self.keys = pickle.loads(self.lmdbTxn.get("thisFileIndex".encode()))        
         for readName in self.keys:
             yield self.__readFastaReadFromLmdb(readName)
 
     def iter(self):
-        """
-        iter
-        """
         if self.useIndex:
             return self.__readLmdb()
         else:
             return self.__readFasta()
-
+    
     def close(self):
         self.lmdbEnv.close()
 

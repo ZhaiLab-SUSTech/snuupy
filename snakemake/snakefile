@@ -1,10 +1,10 @@
-configfile: "/public/home/liuzj/publicPipeline/snuupy/snakemake/config.yaml"
+configfile: "/public/home/liuzj/github/snuupy/snakemake/config.yaml"
 pipelineDir = config['pipelineDir']
 
 
 rule all:
     input:
-        generateMtxFinished = f"{config['resultDir']}step16_generateMtx/generateMtxFinished.empty"
+        f"{config['resultDir']}step16_generateMtx/generateMtxFinished.empty"
 
 rule runCellRanger:
     input:
@@ -173,18 +173,15 @@ rule polishReads:
     params:
         polishReadsTempRaw = f"{config['resultDir']}step10_polishReads/polishReadsTempRaw/",
         polishReadsTempFinal = f"{config['resultDir']}step10_polishReads/polishReadsTempFinal/",
-        minimap2Path = config['minimap2Path'],
         seqkitPath = config['seqkitPath'],
-        poaPath = config['poaPath'],
         raconPath = config['raconPath'],
-        penaltyMatPath = config['penaltyMatPath'],
         gpu = "0"
 
     threads:56
     shell:
         """
 cd {pipelineDir}
-python ./snuupy/snuupy.py polishReads -i {input.nanoporeAssigned} -f {input.rawNanoporeFa} -T {params.polishReadsTempRaw} -F {params.polishReadsTempFinal} -o {output.polishedReads} -p {params.penaltyMatPath} -t {threads} --minimap2 {params.minimap2Path} --poa {params.poaPath} --racon {params.raconPath} --seqkit {params.seqkitPath}
+python ./snuupy/snuupy.py polishReads -i {input.nanoporeAssigned} -f {input.rawNanoporeFa} -T {params.polishReadsTempRaw} -F {params.polishReadsTempFinal} -o {output.polishedReads} -t {threads} --racon {params.raconPath} --seqkit {params.seqkitPath}
         """
 
 rule minimapMappingPolished:
