@@ -14,7 +14,7 @@ from .tools import FastaContent, writeFasta
 
 def consensusByPoa(readLs, umi, outputPath, readCounts) -> str:
     seqLs = [x.seq for x in readLs]
-    poaAligner = poa.msa_aligner(match=5)
+    poaAligner = poa.msa_aligner(match=5, extra_b=-1)
     poaRes = poaAligner.msa(seqLs, out_cons=True, out_msa=False)
     poaConsSeq = poaRes.cons_seq[0]
     with open(outputPath, "w") as fh:
