@@ -54,11 +54,11 @@ Commands:
   - pyfastx
   - snfpy
   - mofapy2
+  - abPOA
 - R
   - scran
 - Snakemake 
 - minimap2 
-- poaV2 
 - seqkit 
 - racon 
 - picard 
