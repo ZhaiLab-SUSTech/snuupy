@@ -6,7 +6,7 @@ single-nucleus utility in python
 # Tutorial
 ![Schematic_diagram](./Schematic_diagram.png)
 
-Git clone or download this repository then modify the paths in the configuration file before running snakemake. 
+Git clone or download this repository, then change the path in the config file before running snakemake.
 
 # Usage
 ```text
