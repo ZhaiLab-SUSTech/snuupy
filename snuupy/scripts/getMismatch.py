@@ -6,6 +6,7 @@ from Bio import Align
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from more_itertools import chunked
+from tqdm import tqdm
 
 
 def getAlignScore(line):
@@ -43,6 +44,7 @@ def getAlignScore(line):
 
 
 def getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT):
+    THREADS = min([24, THREADS])
 
     kit2UmiLengthDt = {"v2": 10, "v3": 12}
     umiLength = kit2UmiLengthDt[KIT]
@@ -60,7 +62,7 @@ def getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT):
     seqTransformer = jseq()
     bamDict = defaultdict(lambda: [])
 
-    for x in addSeqBam:
+    for x in tqdm(addSeqBam, "parse bam file",total=addSeqBam.mapped):
         readESSeq = x.get_tag("ES")
         readFSSeq = x.get_tag("FS")
         if x.is_reverse:
@@ -90,7 +92,7 @@ def getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT):
         THREADS * 5000 * 2,
     )
     alignResult = []
-    for chunkBlastResult in iterBlastResult:
+    for chunkBlastResult in tqdm(iterBlastResult, 'get align score', total=(len(blastResult) // (THREADS * 5000 * 2) + 1)):
         with ProcessPoolExecutor(THREADS) as multiP:
             subAlignResult = multiP.map(getAlignScore, chunkBlastResult, chunksize=5000)
         alignResult.extend(list(subAlignResult))

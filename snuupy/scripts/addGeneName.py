@@ -64,9 +64,10 @@ USECOLS = [
 
 
 def addGeneName(inBamPath, bedAnno, outfile, bedtoolsPath, outBamPath, geneIdTag):
+    logger.info("Start get intersect between bam and bed12")
     intersectBuff = bedtoolsGetIntersect(inBamPath, bedAnno, bedtoolsPath)
 
-    logger.info("Start read csv")
+    logger.info("Start read intersect result")
     df = pd.read_csv(intersectBuff, sep="\t", names=NAMES, usecols=USECOLS, header=None)
     logger.info("Read csv Done!")
 
@@ -75,6 +76,19 @@ def addGeneName(inBamPath, bedAnno, outfile, bedtoolsPath, outBamPath, geneIdTag
     df["geneBlockStarts"] = df["geneBlockStarts"].map(
         lambda x: np.fromstring(x, sep=",")
     )
+
+    differentSr = df["geneBlockStarts"].map(len) < df["geneBlockSizes"].map(len)
+    sizeDiffStartUmi = '\t'.join(list(df.loc[differentSr]['Name']))
+    if sizeDiffStartUmi:
+        logger.warning(f"block size counts different with block start counts, ignored: {sizeDiffStartUmi}")
+        df = df.loc[~differentSr]
+        # df['geneBlockStartCounts'] = df["geneBlockStarts"].map(len)
+        # newGeneBlockSizesLs = []
+        # for lineTp in df.itertuples():
+        #     newGeneBlockSizesLs.append(lineTp.geneBlockStarts[:lineTp.geneBlockStartCounts])
+        # df['geneBlockSizes'] = newGeneBlockSizesLs
+        # del(df['geneBlockStartCounts'])
+
     df["five_ss"] = (
         df["geneStart"] + df["geneBlockSizes"] + df["geneBlockStarts"]
     ).map(lambda x: x[:-1])
@@ -118,47 +132,47 @@ def addGeneName(inBamPath, bedAnno, outfile, bedtoolsPath, outBamPath, geneIdTag
 
     logger.info("Gene Assign Done!")
 
-    specificDf["geneNameTrue"] = specificDf["geneName"].str.split(".").str[0]
-    specificDf["geneAssignGene"] = specificDf.pipe(
-        lambda x: x["Name"].map(lambda y: results[y]["gene_id"])
-    )
-    specificDf = specificDf.query("geneAssignGene == geneNameTrue")
-    specificDf["isoformName"] = specificDf["geneName"].str.split("_").str[0]
-    specificDf = specificDf.loc[:, ["Name", "cov", "isoformName"]]
-    specificDfGroup = specificDf.groupby("Name").apply(
-        lambda z: {x: y for x, y in zip(z["isoformName"], z["cov"])}
-    )
-    specificDfGroup = specificDfGroup.to_dict()
+    # specificDf["geneNameTrue"] = specificDf["geneName"].str.split(".").str[0]
+    # specificDf["geneAssignGene"] = specificDf.pipe(
+    #     lambda x: x["Name"].map(lambda y: results[y]["gene_id"])
+    # )
+    # specificDf = specificDf.query("geneAssignGene == geneNameTrue")
+    # specificDf["isoformName"] = specificDf["geneName"].str.split("_").str[0]
+    # specificDf = specificDf.loc[:, ["Name", "cov", "isoformName"]]
+    # specificDfGroup = specificDf.groupby("Name").apply(
+    #     lambda z: {x: y for x, y in zip(z["isoformName"], z["cov"])}
+    # )
+    # specificDfGroup = specificDfGroup.to_dict()
 
-    for readName, geneBedInfo in results.items():
-        isoformMappingRatio = geneBedInfo["isoform_mapping_ratio"]
-        if len(isoformMappingRatio) == 1:
-            isoformName = list(isoformMappingRatio.keys())[0]
-        else:
-            readSpecificDfGroup = specificDfGroup.get(readName, {})
-            readSpecificDfGroup = {
-                x: readSpecificDfGroup.get(x, 0) for x in isoformMappingRatio.keys()
-            }
-            maxIsoformCoverageLength = max(readSpecificDfGroup.values())
-            cutLength = maxIsoformCoverageLength - 15
-            putativeIsoforms = [
-                x for x, y in readSpecificDfGroup.items() if y > cutLength
-            ]
-            if len(putativeIsoforms) == 1:
-                isoformName = putativeIsoforms[0]
-            else:
-                putativeIsoforms.sort(key=lambda x: isoformMappingRatio[x])
-                putativeIsoformMappingRatio = np.array(
-                    [isoformMappingRatio[x] for x in putativeIsoforms]
-                )
-                if (
-                    putativeIsoformMappingRatio[-1] - putativeIsoformMappingRatio[-2]
-                    > 0.1
-                ):
-                    isoformName = putativeIsoforms[-1]
-                else:
-                    isoformName = geneBedInfo["gene_id"] + ".N"
-        results[readName]["isoform_id"] = isoformName
+    # for readName, geneBedInfo in results.items():
+    #     isoformMappingRatio = geneBedInfo["isoform_mapping_ratio"]
+    #     if len(isoformMappingRatio) == 1:
+    #         isoformName = list(isoformMappingRatio.keys())[0]
+    #     else:
+    #         readSpecificDfGroup = specificDfGroup.get(readName, {})
+    #         readSpecificDfGroup = {
+    #             x: readSpecificDfGroup.get(x, 0) for x in isoformMappingRatio.keys()
+    #         }
+    #         maxIsoformCoverageLength = max(readSpecificDfGroup.values())
+    #         cutLength = maxIsoformCoverageLength - 15
+    #         putativeIsoforms = [
+    #             x for x, y in readSpecificDfGroup.items() if y > cutLength
+    #         ]
+    #         if len(putativeIsoforms) == 1:
+    #             isoformName = putativeIsoforms[0]
+    #         else:
+    #             putativeIsoforms.sort(key=lambda x: isoformMappingRatio[x])
+    #             putativeIsoformMappingRatio = np.array(
+    #                 [isoformMappingRatio[x] for x in putativeIsoforms]
+    #             )
+    #             if (
+    #                 putativeIsoformMappingRatio[-1] - putativeIsoformMappingRatio[-2]
+    #                 > 0.1
+    #             ):
+    #                 isoformName = putativeIsoforms[-1]
+    #             else:
+    #                 isoformName = geneBedInfo["gene_id"] + ".N"
+    #     results[readName]["isoform_id"] = isoformName
 
     logger.info("Main function Done!")
 

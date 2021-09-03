@@ -22,7 +22,7 @@ def getGenomeUpper(genomeIndexPath, window, i):
     return genomeIndex
 
 
-def parseOneReadToWindow(read, window, upperLimit, outputPath):
+def parseOneReadToWindow(read, window, upperLimit, outputPath, byPrimer):
     name = read.qname
     windowStart = read.reference_start//window
     windowEnd = read.reference_end//window
@@ -33,13 +33,20 @@ def parseOneReadToWindow(read, window, upperLimit, outputPath):
         windowEnd += 1
 
     windowLs = list(set([windowStart, windowStart+1, windowStart+2, windowEnd-2, windowEnd-1, windowEnd]))
-    unmappedBaseE, unmappedBaseLengthE = read.get_tag('ES'), read.get_tag('EL')
-    unmappedBaseF, unmappedBaseLengthF = read.get_tag('FS'), read.get_tag('FL')
-    nameE = f'{name}_e_{unmappedBaseLengthE}'
-    nameF = f'{name}_f_{unmappedBaseLengthF}'
-    contentE = f'>{nameE}\n{unmappedBaseE}\n'
-    contentF = f'>{nameF}\n{unmappedBaseF}\n'
-    content = contentF + contentE
+    if byPrimer:
+        unmappedBase, primerCat = read.get_tag('PS'), read.get_tag('PC')
+        name = f'{name}_byPrimer_{primerCat}'
+        content = f'>{name}\n{unmappedBase}\n'
+
+    else:
+        unmappedBaseE, unmappedBaseLengthE = read.get_tag('ES'), read.get_tag('EL')
+        unmappedBaseF, unmappedBaseLengthF = read.get_tag('FS'), read.get_tag('FL')
+        nameE = f'{name}_e_{unmappedBaseLengthE}'
+        nameF = f'{name}_f_{unmappedBaseLengthF}'
+        contentE = f'>{nameE}\n{unmappedBaseE}\n'
+        contentF = f'>{nameF}\n{unmappedBaseF}\n'
+        content = contentF + contentE
+        
     for window in windowLs:
         windowPath = f'{outputPath}{window}.fa'
         with open(windowPath,'a') as fh:
@@ -51,7 +58,7 @@ def parseOneChr(bamChrFetch, window, upperLimit, outputPath):
         parseOneReadToWindow(read, window, upperLimit, outputPath)
 
 
-def generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, useColumn):
+def generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, useColumn, byPrimer):
     """
     output nanopore reads based on mapping info
 
@@ -60,6 +67,7 @@ def generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, useColumn):
     BAM_PATH: bam added unmapped base tag ; format bam.
     OUT_PAT: output dir; end with /
     WINDOW: window size, same as <parseIllumina>
+    
     """
     os.system(f'samtools index {BAM_PATH}')
     genomeUpper = getGenomeUpper(GENOME_INDEX, WINDOW, useColumn)

@@ -120,20 +120,26 @@ def _generateIlluminaWindowFromKb(
 
 
 @main.command("addUnmappedBaseTag")
-@click.option("-i", "BAM_PATH", help="minimap2 output; bam format")
+@click.option("-i", "BAM_PATH", help="minimap2 output; bam format", required=True)
 @click.option("-f", "NANOPORE_FASTA", help="raw nanopore seq; fasta format")
-@click.option("-o", "BAM_PATH_OUT", help="output bam")
+@click.option("-o", "BAM_PATH_OUT", help="output bam", required=True)
 @click.option(
     "--in-disk", "IN_DISK", is_flag=True, help="store sequences on disk instead of mem"
 )
-def _addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK):
+@click.option("--by-primer", "BY_PRIMER", is_flag=True, help="Extraction of region between primers and aligned sequences")
+def _addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK, BY_PRIMER):
     """
     \b
     get unmapped base tag
     """
-    from scripts.addUnmappedBaseTag import addUnmappedBaseTag
+    if not BY_PRIMER:
+        from scripts.addUnmappedBaseTag import addUnmappedBaseTag
 
-    addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK)
+        addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK)
+    
+    else:
+        from scripts.addUnmappedBaseTag_needPrimer import main as addUnmappedBaseTag
+        addUnmappedBaseTag(BAM_PATH, BAM_PATH_OUT)
 
 
 @main.command("generateNanoporeWindow")
