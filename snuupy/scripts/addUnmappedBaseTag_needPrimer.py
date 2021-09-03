@@ -56,7 +56,8 @@ def get_putative(
     else:
         seq_putative = seq_clip[x.aligned[1][-1][-1] :]
         cat = 'mapping_F5'
-
+    if not seq_putative:
+        seq_putative = 'A'
     read.set_tag("PS", seq_putative)
     read.set_tag("PC", cat)
 
