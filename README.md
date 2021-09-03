@@ -55,6 +55,8 @@ Commands:
   - snfpy
   - mofapy2
   - abPOA
+  - tqdm
+  - pysam
 - R
   - scran
 - Snakemake 
