@@ -46,6 +46,8 @@ def _generateIlluminaWindow(ILLUMINA_INDEX, OUT_DIR):
     output illumina reads based on mapping info
     """
     from scripts.generateIlluminaWindow import generateIlluminaWindow
+    import sh
+    sh.mkdir(OUT_DIR, p=True)
 
     generateIlluminaWindow(ILLUMINA_INDEX, OUT_DIR)
 
@@ -107,7 +109,8 @@ def _generateIlluminaWindowFromKb(
         windowSize; default 500
     """
     from scripts.generateIlluminaWindowFromKb import generateIlluminaWindowFromKb
-
+    import sh
+    sh.mkdir(OUT_DIR, p=True)
     generateIlluminaWindowFromKb(
         t2gPath,
         ecPath,
@@ -146,8 +149,8 @@ def _addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK, BY_PRIM
 @click.option("--genome", "GENOME_INDEX", help="the fai format file")
 @click.option(
     "--genomeCounts",
-    "useColumn",
-    default=5,
+    "COLUMN",
+    default=100,
     type=int,
     show_default=True,
     help="chromosome counts",
@@ -155,13 +158,15 @@ def _addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK, BY_PRIM
 @click.option("-b", "BAM_PATH", help="bam added unmapped base tag ; format bam")
 @click.option("-o", "OUT_PATH", help="output dir; end with / ")
 @click.option("-w", "WINDOW", type=int, help="window size, same as Illumina")
-def _generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, useColumn):
+@click.option("--by-primer", "BY_PRIMER", is_flag=True, help="Extraction of region between primers and aligned sequences")
+def _generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, COLUMN, BY_PRIMER):
     """
     output nanopore reads based on mapping info
     """
     from scripts.generateNanoporeWindow import generateNanoporeWindow
-
-    generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, useColumn)
+    import sh
+    sh.mkdir(OUT_PATH, p=True)
+    generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, COLUMN, BY_PRIMER)
 
 
 @main.command("windowBlast")
@@ -178,7 +183,8 @@ def _windowBlast(ILLUMINA_DIR, NANOPORE_DIR, BLAST_DIR, THREADS, BLAST_PATH, KIT
     blast find potential UMI/Bc
     """
     from scripts.windowBlast import windowBlast
-
+    import sh
+    sh.mkdir(BLAST_DIR, p=True)
     windowBlast(ILLUMINA_DIR, NANOPORE_DIR, BLAST_DIR, THREADS, BLAST_PATH, KIT)
 
 
@@ -190,13 +196,14 @@ def _windowBlast(ILLUMINA_DIR, NANOPORE_DIR, BLAST_DIR, THREADS, BLAST_PATH, KIT
 @click.option(
     "--kit", "KIT", default="v2", help="10x kit version; v2|v3", show_default=True
 )
-def _getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT):
+@click.option("--by-primer", "BY_PRIMER", is_flag=True, help="Extraction of region between primers and aligned sequences")
+def _getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER):
     """
     calculate mismatch based on blast results
     """
     from scripts.getMismatch import getMismatch
 
-    getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT)
+    getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER)
 
 
 @main.command("barcodeAssignment")

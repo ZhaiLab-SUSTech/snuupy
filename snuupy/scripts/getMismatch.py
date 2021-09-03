@@ -43,7 +43,7 @@ def getAlignScore(line):
     return [str(x) for x in [barcodeUmiScore, barcodeScore, umiScore, mappingStrand]]
 
 
-def getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT):
+def getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER):
     THREADS = min([24, THREADS])
 
     kit2UmiLengthDt = {"v2": 10, "v3": 12}
@@ -62,29 +62,44 @@ def getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT):
     seqTransformer = jseq()
     bamDict = defaultdict(lambda: [])
 
-    for x in tqdm(addSeqBam, "parse bam file",total=addSeqBam.mapped):
-        readESSeq = x.get_tag("ES")
-        readFSSeq = x.get_tag("FS")
-        if x.is_reverse:
-            readStrand = 1
+    for x in tqdm(addSeqBam, "parse bam file", total=addSeqBam.mapped):
+        if not BY_PRIMER:
+            readESSeq = x.get_tag("ES")
+            readFSSeq = x.get_tag("FS")
+            if x.is_reverse:
+                readStrand = 1
+            else:
+                readStrand = 0
+            bamDict[x.qname].extend(
+                [
+                    readESSeq,
+                    seqTransformer.reverseComplement(readESSeq),
+                    readFSSeq,
+                    seqTransformer.reverseComplement(readFSSeq),
+                    readStrand,
+                ]
+            )
         else:
-            readStrand = 0
-        bamDict[x.qname].extend(
-            [
-                readESSeq,
-                seqTransformer.reverseComplement(readESSeq),
-                readFSSeq,
-                seqTransformer.reverseComplement(readFSSeq),
-                readStrand,
-            ]
-        )
+            readPSSeq = x.get_tag("PS")
+            if x.is_reverse:
+                readStrand = 1
+            else:
+                readStrand = 0
+            bamDict[x.qname].extend(
+                [
+                    readPSSeq,
+                    seqTransformer.reverseComplement(readPSSeq),
+                    readStrand,
+                ]
+            )
 
     blastResult.drop_duplicates(["qseqid", "sseqid"], inplace=True)
     blastResult["name"] = blastResult["sseqid"].str.split("_", expand=True)[0]
     blastResult["unmappedSeq"] = blastResult["name"].map(bamDict)
+    
     blastResult["unmappedSeq"], blastResult["readStrand"] = (
-        blastResult["unmappedSeq"].str[:4],
-        blastResult["unmappedSeq"].str[4],
+        blastResult["unmappedSeq"].str[:-1],
+        blastResult["unmappedSeq"].str[-1],
     )
 
     iterBlastResult = chunked(
