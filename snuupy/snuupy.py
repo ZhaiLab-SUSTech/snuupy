@@ -400,7 +400,7 @@ def _addPolyATag(
 
 @main.command("polyAClusterDetected")
 @click.option("--infile", required=True, help="bam added gene tag and polyA tag")
-@click.option("--gene-bed", required=True, help="GENE BED , NOT BED 12!")
+@click.option("--gene-bed", required=True, help="GENE BED , NOT BED 12 (transcripts)!")
 @click.option("--out-dir", "out_suffix", required=True, help="out dir; ends with /")
 @click.option("-t", "--threads", required=False, help="threads", default=10)
 @click.option("--fasta", "fastaPath", help="genome fa")

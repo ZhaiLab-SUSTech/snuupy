@@ -12,12 +12,13 @@ import sh
 import click
 import pandas as pd
 from joblib import Parallel, delayed
+from tqdm import tqdm
 from .tools import creatUnexistedDir
 
 
 def scanRefFasta(refPath):
     listPath = []
-    for singleChr in os.listdir(refPath):
+    for singleChr in tqdm(os.listdir(refPath), 'get window\'s information'):
         currentChrPath = refPath + singleChr + "/"
         for singleWindow in os.listdir(currentChrPath):
             singleWindowFastas = os.listdir(f"{currentChrPath}/{singleWindow}")

@@ -135,7 +135,7 @@ def filterResultsBasedOnGeneName(INTRON_INFO, GENE_NAME_INFO, OUT_PATH):
     with open(GENE_NAME_INFO, 'rb') as fh:
         geneNameInfo = pickle.load(fh)
     intronInfo = pd.read_table(INTRON_INFO)
-    intronInfo["geneIdNonTrans"] = intronInfo["GeneId"].str.split(".").str[0]
+    intronInfo["geneIdNonTrans"] = intronInfo["GeneId"].str.split("||").str[-1]
     intronInfo["baselineGeneId"] = intronInfo["Name"].map(
         lambda x: geneNameInfo.get(x, {"gene_id": 0})["gene_id"])
     intronInfo.query("geneIdNonTrans == baselineGeneId", inplace=True)

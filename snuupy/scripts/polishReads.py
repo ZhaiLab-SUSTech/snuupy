@@ -62,7 +62,7 @@ def processOneUmi(
         read.name = f"{umi}_{readCounts}"
         with open(readFinalOutputPath, "w") as fh:
             writeFasta(readLs[0], fh)
-        cmdStr = 'echo ""'
+        cmdStr = 'true'
     else:
         readLs = readLs[:10]
         with open(umiAllReadPath, "w") as fh:
@@ -101,7 +101,7 @@ def processOneChunk(
             logger.warning(f"detect error when process {umiWithReadId[0]}")
     commandExecutedCmd = " ;\\\n".join(commandExecutedCmdLs)
     os.system(commandExecutedCmd)
-    logger.info(f"{i*64} UMIs processed; total {totalUmiCounts}")
+    logger.info(f"{i*256} UMIs processed; total {totalUmiCounts}")
 
 
 def polishReads(
@@ -138,7 +138,7 @@ def polishReads(
 
     logger.info('start polish')
     totalUmiCounts = len(sameUmiReadDt)
-    umiWithReadIdLsIter = chunked(sameUmiReadDt.items(), 64)
+    umiWithReadIdLsIter = chunked(sameUmiReadDt.items(), 256)
     allResults = []
     with ProcessPoolExecutor(threads) as multiP:
         for i, umiWithReadIdLs in enumerate(umiWithReadIdLsIter):

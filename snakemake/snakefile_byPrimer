@@ -330,7 +330,9 @@ rule polishReads:
     shell:
         """
 cd {pipelineDir}
-python ./snuupy/snuupy.py polishReads -i {params.nanoporeAssigned} -f {params.rawFa} -T {params.dirTempRaw} -F {params.dirTempFinal} -o {params.polishedFa} -t {threads} --racon {params.path_seqkit} --seqkit {params.path_racon}
+mkdir -p {params.dirTempRaw}
+mkdir -p {params.dirTempFinal}
+python ./snuupy/snuupy.py polishReads -i {params.nanoporeAssigned} -f {params.rawFa} -T {params.dirTempRaw} -F {params.dirTempFinal} -o {params.polishedFa} -t {threads} --racon {params.path_racon} --seqkit {params.path_seqkit}
 touch {output.polishReadsFinished}
         """
 
