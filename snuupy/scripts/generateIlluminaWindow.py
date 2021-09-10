@@ -39,4 +39,5 @@ def generateIlluminaWindow(ILLUMINA_INDEX, OUT_DIR):
         for singleWindow in parsedIndex[chr_].keys():
             currentWindowPath = currentChr + singleWindow + "/"
             windowBarcodes = parsedIndex[f"{chr_}/{singleWindow}"][()].astype(str)
-            generateOneWindow(currentWindowPath, windowBarcodes)
+            if len(windowBarcodes) > 0:
+                generateOneWindow(currentWindowPath, windowBarcodes)

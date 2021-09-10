@@ -1,0 +1,40 @@
+pipelineDir:
+  '/public/home/liuzj/github/snuupy/'
+resultDir:
+  '/public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/'
+
+#inpuf files
+rawNanoporeFa:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/nanopore.fa'
+
+#genome files
+geneAnnoBed:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/gene.bed'
+genomeFa:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa'
+genomeFai:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa.fai'
+
+#softwares path
+minimap2Path:
+  '/public/home/liuzj/softwares/anaconda3/bin/minimap2'
+picardPath:
+  '/public/home/liuzj/softwares/picard/picard.jar'
+seqkitPath:
+  '/public/home/liuzj/softwares/anaconda3/bin/seqkit'
+vmatchPath:
+  '/public/home/liuzj/softwares/anaconda3/bin/'
+raconPath:
+  '/public/home/liuzj/softwares/racon/build/bin/racon'
+bedtoolsPath:
+  '/public/home/liuzj/softwares/anaconda3/bin/bedtools'
+
+
+
+#cellranger configs
+runCellRangerConfig:
+  '/public/home/liuzj/github/snuupy/removeExonRegion/cellRangerParameter.yaml'
+
+#reads path
+illuminaFastqs:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/illuminaFastq/'

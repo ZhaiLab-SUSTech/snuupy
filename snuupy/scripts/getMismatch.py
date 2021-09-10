@@ -43,20 +43,31 @@ def getAlignScore(line):
     return [str(x) for x in [barcodeUmiScore, barcodeScore, umiScore, mappingStrand]]
 
 
-def getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER):
+def getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER, BY_VMATCH):
     THREADS = min([24, THREADS])
 
     kit2UmiLengthDt = {"v2": 10, "v3": 12}
     umiLength = kit2UmiLengthDt[KIT]
 
-    blastResult = pd.read_csv(
-        MAPPING_RESULT,
-        sep="\t",
-        header=None,
-        names="qseqid sseqid length qstart qend mismatch gaps bitscore score".split(
-            " "
-        ),
-    )
+    if not BY_VMATCH:
+        blastResult = pd.read_csv(
+            MAPPING_RESULT,
+            sep="\t",
+            header=None,
+            names="qseqid sseqid length qstart qend mismatch gaps bitscore score".split(
+                " "
+            ),
+        )
+    else:
+        blastResult = pd.read_csv(
+            MAPPING_RESULT,
+            sep="\s+",
+            header=None,
+            usecols=[1, 5]
+            )
+        blastResult.columns = ['sseqid', 'qseqid']
+        blastResult = blastResult.reindex(columns=['qseqid', 'sseqid'])
+
     addSeqBam = pysam.AlignmentFile(ADD_SEQ_BAM, "r")
 
     seqTransformer = jseq()

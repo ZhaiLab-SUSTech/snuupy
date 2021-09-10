@@ -1,0 +1,360 @@
+import pandas as pd
+#configfile: "/public/home/liuzj/github/snuupy/snakemake/config_byPrimerVmatch.yaml"
+pipelineDir = config['pipelineDir']
+resultDir = config["resultDir"].rstrip("/") + "/"
+pipelineDir = config["pipelineDir"].rstrip("/") + "/"
+
+
+## get parameter of rule `runCellRanger` ##
+df_runCellRanger = pd.DataFrame(
+    [config["runCellRangerConfig"]], index=["test"], columns=["cellRangerConfig"]
+)
+df_runCellRanger = df_runCellRanger.assign(
+    useBarcodeGz=lambda df: df.index
+    + "/outs/filtered_feature_bc_matrix/barcodes.tsv.gz",
+    useBarcode=lambda df: df.index + "/outs/filtered_feature_bc_matrix/barcodes.tsv",
+    cellRangerBam=lambda df: df.index + "/outs/possorted_genome_bam.bam",
+)
+for column in ['useBarcodeGz', 'useBarcode', 'cellRangerBam']:
+    df_runCellRanger[column] = resultDir + 'step1_runCellRanger/' + df_runCellRanger[column]
+
+
+## get parameter of rule `parseIllumina` ##
+df_parseIllumina = pd.DataFrame([500], index=["windowSize"], columns=["test"]).T
+df_parseIllumina = df_parseIllumina.assign(
+    genomeFai=config["genomeFai"],
+    useBarcodeGz=lambda df: df.index
+    + "/outs/filtered_feature_bc_matrix/barcodes.tsv.gz",
+    useBarcode=lambda df: df.index + "/outs/filtered_feature_bc_matrix/barcodes.tsv",
+    cellRangerBam=lambda df: df.index + "/outs/possorted_genome_bam.bam",
+    parseIlluminaResults=lambda df: df.index + ".parsed.index",
+)
+for column in ['parseIlluminaResults']:
+    df_parseIllumina[column] = resultDir + 'step2_parseIllumina/' + df_parseIllumina[column]
+
+
+## get parameter of rule `minimapMappingRaw` ##
+df_minimapMappingRaw = pd.DataFrame(
+    [
+        config["rawNanoporeFa"],
+        config["minimap2Path"],
+        config["genomeFa"],
+        config["geneAnnoBed"],
+    ],
+    index=["rawNanoporeFa", 'minimap2Path', 'genomeFa', 'geneAnnoBed'],
+    columns=["test"],
+).T.assign(outputBam = lambda df:df.index + '.rawMappingResult.bam')
+for column in ['outputBam']:
+    df_minimapMappingRaw[column] = resultDir + 'step3_minimapMappingRaw/' + df_minimapMappingRaw[column]
+
+
+## get parameter of rule `addUnmappedBaseTag` ##
+df_addUnmappedBaseTag = pd.DataFrame(["test.addBase.bam"],index=["output"],columns=["test"]).T
+for column in ['output']:
+    df_addUnmappedBaseTag[column] = resultDir + 'step4_addUnmappedBaseTag/' + df_addUnmappedBaseTag[column]
+
+
+## get parameter of rule `generateNanoporeWindow` ##
+df_generateNanoporeWindow = pd.DataFrame(index=['test'])
+df_generateNanoporeWindow = df_generateNanoporeWindow.pipe(lambda df:df.assign(
+    outputDir = df.index + '/outputDir/',
+    windowSize = 500,
+    genomeFai = config["genomeFai"]
+))
+for column in ['outputDir']:
+    df_generateNanoporeWindow[column] = resultDir + 'step5_generateNanoporeWindow/' + df_generateNanoporeWindow[column]
+
+
+## get parameter of rule `generateIlluminaWindow` ##
+df_generateIlluminaWindow = pd.DataFrame(index=['test'])
+df_generateIlluminaWindow = df_generateIlluminaWindow.pipe(lambda df:df.assign(
+    illuminaDir = df.index + '/outputDir/',
+))
+for column in ['illuminaDir']:
+    df_generateIlluminaWindow[column] = resultDir + 'step6_generateIlluminaWindow/' + df_generateIlluminaWindow[column]
+
+
+## get parameter of rule `windowBlast` ##
+df_windowBlast = pd.DataFrame(index=['test'])
+df_windowBlast = df_windowBlast.pipe(lambda df:df.assign(
+    dirResults = df.index + '/output/',
+    vmatchPath = config['vmatchPath'],
+    mergedResult = df.index + '/output/all.tsv'
+))
+for column in ['dirResults', 'mergedResult']:
+    df_windowBlast[column] = resultDir + 'step7_windowBlast/' + df_windowBlast[column]
+
+
+## get parameter of rule `getMismatch` ##
+df_getMismatch = pd.DataFrame(index=['test'])
+df_getMismatch = df_getMismatch.pipe(lambda df:df.assign(
+    nanoporeED = df.index + '.nanoporeED.feather'
+))
+for column in ['nanoporeED']:
+    df_getMismatch[column] = resultDir + 'step8_getMismatch/' + df_getMismatch[column]
+
+
+## get parameter of rule `barcodeAssignment` ##
+df_barcodeAssignment = pd.DataFrame(index=['test'])
+df_barcodeAssignment = df_barcodeAssignment.pipe(lambda df:df.assign(
+    nanoporeAssigned = df.index + '.nanoporeAssigned.feather',
+    barcodeED = 3,
+    umiED=3
+))
+for column in ['nanoporeAssigned']:
+    df_barcodeAssignment[column] = resultDir + 'step9_barcodeAssignment/' + df_barcodeAssignment[column]
+
+
+## get parameter of rule `polishReads` ##
+df_polishReads = pd.DataFrame(index=['test'])
+df_polishReads = df_polishReads.pipe(lambda df:df.assign(
+    rawFa = config['rawNanoporeFa'],
+    polishedFa = df.index + '.polished.fa',
+    dirTempRaw = df.index + '/tempRaw/',
+    dirTempFinal = df.index + '/tempFinal/',
+    path_seqkit = config['seqkitPath'],
+    path_racon = config['raconPath']
+))
+for column in ['polishedFa', 'dirTempRaw', 'dirTempFinal']:
+    df_polishReads[column] = resultDir + 'step10_polishReads/' + df_polishReads[column]
+
+
+## get parameter of rule `minimapMappingPolished` ##
+df_minimapMappingPolished = pd.DataFrame(index=['test'])
+df_minimapMappingPolished = df_minimapMappingPolished.pipe(lambda df:df.assign(
+    mappingBam = df.index + '.mappingBam.bam',
+    genomeFa = config['genomeFa'],
+    geneAnnoBed = config['geneAnnoBed'],
+    path_minimap2 = config['minimap2Path']
+))
+for column in ['mappingBam']:
+    df_minimapMappingPolished[column] = resultDir + 'step11_minimapMappingPolished/' + df_minimapMappingPolished[column]
+
+rule all:
+    input:
+        minimapMappingPolishedFinished = [resultDir + 'step11_minimapMappingPolished/' + "" + sample + ".finished" for sample in df_minimapMappingPolished.index],
+
+rule runCellRanger:
+    input:
+        cellRangerConfig = lambda wildcard: df_runCellRanger.at[wildcard.sample, 'cellRangerConfig'],
+    output:
+        runCellRangerFinished = resultDir + 'step1_runCellRanger/' + '{sample}.finished',
+    params:
+        gpu = 0,
+    threads:56
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+python ./removeExonRegion/removeExonRegion.py runCellRanger -p {input.cellRangerConfig}
+touch {output.runCellRangerFinished}
+        """
+
+rule parseIllumina:
+    input:
+        runCellRangerFinished = resultDir + 'step1_runCellRanger/' + '{sample}.finished',
+    output:
+        parseIlluminaFinished = resultDir + 'step2_parseIllumina/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        useBarcode = lambda wildcard: df_runCellRanger.at[wildcard.sample, 'useBarcode'],
+        useBarcodeGz = lambda wildcard: df_runCellRanger.at[wildcard.sample, 'useBarcodeGz'],
+        cellRangerBam = lambda wildcard: df_runCellRanger.at[wildcard.sample, 'cellRangerBam'],
+        windowSize = lambda wildcard: df_parseIllumina.at[wildcard.sample, 'windowSize'],
+        genomeFai = lambda wildcard: df_parseIllumina.at[wildcard.sample, 'genomeFai'],
+        parseIlluminaResults = lambda wildcard: df_parseIllumina.at[wildcard.sample, 'parseIlluminaResults'],
+    threads:8
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+gzip -d -c {params.useBarcodeGz} > {params.useBarcode} &&
+python ./snuupy/snuupy.py parseIllumina --bam {params.cellRangerBam} --barcode {params.useBarcode} --genome {params.genomeFai} --window {params.windowSize} --parsed {params.parseIlluminaResults}
+touch {output.parseIlluminaFinished}
+        """
+
+rule minimapMappingRaw:
+    input:
+        rawNanoporeFa = lambda wildcard: df_minimapMappingRaw.at[wildcard.sample, 'rawNanoporeFa'],
+    output:
+        minimapMappingRawFinished = resultDir + 'step3_minimapMappingRaw/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        minimap2Path = lambda wildcard: df_minimapMappingRaw.at[wildcard.sample, 'minimap2Path'],
+        genomeFa = lambda wildcard: df_minimapMappingRaw.at[wildcard.sample, 'genomeFa'],
+        geneAnnoBed = lambda wildcard: df_minimapMappingRaw.at[wildcard.sample, 'geneAnnoBed'],
+        outputBam = lambda wildcard: df_minimapMappingRaw.at[wildcard.sample, 'outputBam'],
+    threads:48
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+{params.minimap2Path} -ax splice --secondary=no -uf --MD --sam-hit-only -t {threads} --junc-bed {params.geneAnnoBed} {params.genomeFa} {input.rawNanoporeFa} | samtools sort - -o {params.outputBam} && samtools index {params.outputBam}
+touch {output.minimapMappingRawFinished}
+        """
+
+rule addUnmappedBaseTag:
+    input:
+        minimapMappingRawFinished = resultDir + 'step3_minimapMappingRaw/' + '{sample}.finished',
+    output:
+        addUnmappedBaseTagFinished = resultDir + 'step4_addUnmappedBaseTag/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        outputBam = lambda wildcard: df_minimapMappingRaw.at[wildcard.sample, 'outputBam'],
+        output = lambda wildcard: df_addUnmappedBaseTag.at[wildcard.sample, 'output'],
+    threads:2
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+python ./snuupy/snuupy.py addUnmappedBaseTag --by-primer -i {params.outputBam} -o {params.output}
+touch {output.addUnmappedBaseTagFinished}
+        """
+
+rule generateNanoporeWindow:
+    input:
+        addUnmappedBaseTagFinished = resultDir + 'step4_addUnmappedBaseTag/' + '{sample}.finished',
+    output:
+        generateNanoporeWindowFinished = resultDir + 'step5_generateNanoporeWindow/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        output = lambda wildcard: df_addUnmappedBaseTag.at[wildcard.sample, 'output'],
+        outputDir = lambda wildcard: df_generateNanoporeWindow.at[wildcard.sample, 'outputDir'],
+        windowSize = lambda wildcard: df_generateNanoporeWindow.at[wildcard.sample, 'windowSize'],
+        genomeFai = lambda wildcard: df_generateNanoporeWindow.at[wildcard.sample, 'genomeFai'],
+    threads:4
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+python ./snuupy/snuupy.py generateNanoporeWindow --by-primer --genome {params.genomeFai} -b {params.output} -w {params.windowSize} -o {params.outputDir} 
+touch {output.generateNanoporeWindowFinished}
+        """
+
+rule generateIlluminaWindow:
+    input:
+        parseIlluminaFinished = resultDir + 'step2_parseIllumina/' + '{sample}.finished',
+    output:
+        generateIlluminaWindowFinished = resultDir + 'step6_generateIlluminaWindow/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        parseIlluminaResults = lambda wildcard: df_parseIllumina.at[wildcard.sample, 'parseIlluminaResults'],
+        illuminaDir = lambda wildcard: df_generateIlluminaWindow.at[wildcard.sample, 'illuminaDir'],
+    threads:4
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+python ./snuupy/snuupy.py generateIlluminaWindow -i {params.parseIlluminaResults} -o {params.illuminaDir}
+touch {output.generateIlluminaWindowFinished}
+        """
+
+rule windowBlast:
+    input:
+        generateIlluminaWindowFinished = resultDir + 'step6_generateIlluminaWindow/' + '{sample}.finished',
+        generateNanoporeWindowFinished = resultDir + 'step5_generateNanoporeWindow/' + '{sample}.finished',
+    output:
+        windowBlastFinished = resultDir + 'step7_windowBlast/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        illuminaDir = lambda wildcard: df_generateIlluminaWindow.at[wildcard.sample, 'illuminaDir'],
+        outputDir = lambda wildcard: df_generateNanoporeWindow.at[wildcard.sample, 'outputDir'],
+        dirResults = lambda wildcard: df_windowBlast.at[wildcard.sample, 'dirResults'],
+        vmatchPath = lambda wildcard: df_windowBlast.at[wildcard.sample, 'vmatchPath'],
+        mergedResult = lambda wildcard: df_windowBlast.at[wildcard.sample, 'mergedResult'],
+    threads:48
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+python ./snuupy/snuupy.py windowBlast --kit v3 -i {params.illuminaDir} -n {params.outputDir} -o {params.dirResults} -t {threads} -b {params.vmatchPath} --by-vmatch 
+touch {output.windowBlastFinished}
+        """
+
+rule getMismatch:
+    input:
+        windowBlastFinished = resultDir + 'step7_windowBlast/' + '{sample}.finished',
+        addUnmappedBaseTagFinished = resultDir + 'step4_addUnmappedBaseTag/' + '{sample}.finished',
+    output:
+        getMismatchFinished = resultDir + 'step8_getMismatch/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        mergedResult = lambda wildcard: df_windowBlast.at[wildcard.sample, 'mergedResult'],
+        output = lambda wildcard: df_addUnmappedBaseTag.at[wildcard.sample, 'output'],
+        nanoporeED = lambda wildcard: df_getMismatch.at[wildcard.sample, 'nanoporeED'],
+    threads:48
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+python ./snuupy/snuupy.py getMismatch --by-primer --by-vmatch --kit v3 -i {params.mergedResult} -b {params.output} -o {params.nanoporeED} -t {threads} 
+touch {output.getMismatchFinished}
+        """
+
+rule barcodeAssignment:
+    input:
+        getMismatchFinished = resultDir + 'step8_getMismatch/' + '{sample}.finished',
+    output:
+        barcodeAssignmentFinished = resultDir + 'step9_barcodeAssignment/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        nanoporeED = lambda wildcard: df_getMismatch.at[wildcard.sample, 'nanoporeED'],
+        nanoporeAssigned = lambda wildcard: df_barcodeAssignment.at[wildcard.sample, 'nanoporeAssigned'],
+        barcodeED = lambda wildcard: df_barcodeAssignment.at[wildcard.sample, 'barcodeED'],
+        umiED = lambda wildcard: df_barcodeAssignment.at[wildcard.sample, 'umiED'],
+    threads:4
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+python ./snuupy/snuupy.py barcodeAssignment -i {params.nanoporeED} -o {params.nanoporeAssigned} --ED-barcode {params.barcodeED} --ED-UMI {params.umiED}
+touch {output.barcodeAssignmentFinished}
+        """
+
+rule polishReads:
+    input:
+        barcodeAssignmentFinished = resultDir + 'step9_barcodeAssignment/' + '{sample}.finished',
+    output:
+        polishReadsFinished = resultDir + 'step10_polishReads/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        nanoporeAssigned = lambda wildcard: df_barcodeAssignment.at[wildcard.sample, 'nanoporeAssigned'],
+        rawFa = lambda wildcard: df_polishReads.at[wildcard.sample, 'rawFa'],
+        polishedFa = lambda wildcard: df_polishReads.at[wildcard.sample, 'polishedFa'],
+        dirTempRaw = lambda wildcard: df_polishReads.at[wildcard.sample, 'dirTempRaw'],
+        dirTempFinal = lambda wildcard: df_polishReads.at[wildcard.sample, 'dirTempFinal'],
+        path_seqkit = lambda wildcard: df_polishReads.at[wildcard.sample, 'path_seqkit'],
+        path_racon = lambda wildcard: df_polishReads.at[wildcard.sample, 'path_racon'],
+    threads:48
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+mkdir -p {params.dirTempRaw}
+mkdir -p {params.dirTempFinal}
+python ./snuupy/snuupy.py polishReads -i {params.nanoporeAssigned} -f {params.rawFa} -T {params.dirTempRaw} -F {params.dirTempFinal} -o {params.polishedFa} -t {threads} --racon {params.path_racon} --seqkit {params.path_seqkit}
+touch {output.polishReadsFinished}
+        """
+
+rule minimapMappingPolished:
+    input:
+        polishReadsFinished = resultDir + 'step10_polishReads/' + '{sample}.finished',
+    output:
+        minimapMappingPolishedFinished = resultDir + 'step11_minimapMappingPolished/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        polishedFa = lambda wildcard: df_polishReads.at[wildcard.sample, 'polishedFa'],
+        mappingBam = lambda wildcard: df_minimapMappingPolished.at[wildcard.sample, 'mappingBam'],
+        genomeFa = lambda wildcard: df_minimapMappingPolished.at[wildcard.sample, 'genomeFa'],
+        geneAnnoBed = lambda wildcard: df_minimapMappingPolished.at[wildcard.sample, 'geneAnnoBed'],
+        path_minimap2 = lambda wildcard: df_minimapMappingPolished.at[wildcard.sample, 'path_minimap2'],
+    threads:48
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+{params.path_minimap2} -ax splice --secondary=no -uf --MD --sam-hit-only -t {threads} --junc-bed {params.geneAnnoBed} {params.genomeFa} {params.polishedFa} | samtools sort - -o {params.mappingBam} && samtools index {params.mappingBam}
+touch {output.minimapMappingPolishedFinished}
+        """
+
+

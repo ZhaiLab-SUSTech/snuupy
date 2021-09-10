@@ -172,20 +172,29 @@ def _generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, COLUMN, BY
 @main.command("windowBlast")
 @click.option("-i", "ILLUMINA_DIR", help='illumina dir; should end with "/"')
 @click.option("-n", "NANOPORE_DIR", help='nanopore dir; should end with "/"')
-@click.option("-o", "BLAST_DIR", help='result dir; should end with "/"')
-@click.option("-b", "BLAST_PATH", help='blast path; should end with "/"')
+@click.option("-o", "RESULT_DIR", help='result dir; should end with "/"')
+@click.option("-b", "SOFT_PATH", help='blast path or vmatch path; should end with "/"')
 @click.option("-t", "THREADS", type=int, help="threads")
 @click.option(
     "--kit", "KIT", default="v2", help="10x kit version; v2|v3", show_default=True
 )
-def _windowBlast(ILLUMINA_DIR, NANOPORE_DIR, BLAST_DIR, THREADS, BLAST_PATH, KIT):
+@click.option("--bc-ed", "BARCODE_ED", default=3, help="barcode edit distance", type=int, show_default=True)
+@click.option("--umi-ed", "UMI_ED", default=2, help="UMI edit distance", type=int, show_default=True)
+@click.option("--by-vmatch", "BY_VMATCH", is_flag=True, help="use vmatch take place of BLAST")
+@click.option("--seed-length", "SEED_LENGTH", default=6, help='seed length', show_default=True)
+def _windowBlast(ILLUMINA_DIR, NANOPORE_DIR, RESULT_DIR, THREADS, SOFT_PATH, KIT, BY_VMATCH, BARCODE_ED, UMI_ED, SEED_LENGTH):
     """
     blast find potential UMI/Bc
     """
-    from scripts.windowBlast import windowBlast
+    
     import sh
-    sh.mkdir(BLAST_DIR, p=True)
-    windowBlast(ILLUMINA_DIR, NANOPORE_DIR, BLAST_DIR, THREADS, BLAST_PATH, KIT)
+    sh.mkdir(RESULT_DIR, p=True)
+    if not BY_VMATCH:
+        from scripts.windowBlast import windowBlast
+        windowBlast(ILLUMINA_DIR, NANOPORE_DIR, RESULT_DIR, THREADS, SOFT_PATH, KIT)
+    else:
+        from scripts.windowBlast_byVmatch import main as windowBlast
+        windowBlast(ILLUMINA_DIR, NANOPORE_DIR, RESULT_DIR, SOFT_PATH, THREADS, KIT, BARCODE_ED, UMI_ED, SEED_LENGTH)
 
 
 @main.command("getMismatch")
@@ -197,13 +206,14 @@ def _windowBlast(ILLUMINA_DIR, NANOPORE_DIR, BLAST_DIR, THREADS, BLAST_PATH, KIT
     "--kit", "KIT", default="v2", help="10x kit version; v2|v3", show_default=True
 )
 @click.option("--by-primer", "BY_PRIMER", is_flag=True, help="Extraction of region between primers and aligned sequences")
-def _getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER):
+@click.option("--by-vmatch", "BY_VMATCH", is_flag=True, help="use vmatch take place of BLAST")
+def _getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER, BY_VMATCH):
     """
     calculate mismatch based on blast results
     """
     from scripts.getMismatch import getMismatch
 
-    getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER)
+    getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER, BY_VMATCH)
 
 
 @main.command("barcodeAssignment")
