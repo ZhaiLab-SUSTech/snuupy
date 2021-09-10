@@ -41,7 +41,7 @@ def get_putative(
         (len(seq_primer5_rev) - primer5RevScore) / 2,
     ]
 
-    if (max(ls_unmapBase) < 5) | (min(ls_unmapBase) > 5):
+    if (max(ls_unmapBase) < 7) | (min(ls_unmapBase) > 7):
         return None
 
     _index = ls_unmapBase.index(min(ls_unmapBase))

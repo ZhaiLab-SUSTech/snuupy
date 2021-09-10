@@ -10,6 +10,7 @@ import sh
 import pysam
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
+from loguru import logger
 
 def getGenomeUpper(genomeIndexPath, window, i):
     """
@@ -53,10 +54,11 @@ def parseOneReadToWindow(read, window, upperLimit, outputPath, byPrimer):
         with open(windowPath,'a') as fh:
             fh.write(content)
 
-def parseOneChr(bamChrFetch, window, upperLimit, outputPath, byPrimer):
+def parseOneChr(chr_, bamChrFetch, window, upperLimit, outputPath, byPrimer):
     os.mkdir(outputPath)   
     for read in bamChrFetch:
         parseOneReadToWindow(read, window, upperLimit, outputPath, byPrimer)
+    logger.info(f"{chr_} done!")
 
 
 def generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, useColumn, byPrimer):
@@ -76,4 +78,4 @@ def generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, useColumn, 
         for chr_, upperLimit in genomeUpper.items():
             bamChrFetch = pysam.AlignmentFile(BAM_PATH).fetch(chr_)
             outputPath = f'{OUT_PATH}{chr_}/'
-            multiT.submit(parseOneChr, bamChrFetch, WINDOW, upperLimit, outputPath, byPrimer)
+            multiT.submit(chr_, parseOneChr, bamChrFetch, WINDOW, upperLimit, outputPath, byPrimer)
