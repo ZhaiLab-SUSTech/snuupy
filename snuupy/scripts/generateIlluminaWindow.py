@@ -19,7 +19,8 @@ def generateOneWindow(chrPath, barcodes):
         subWindowBarcodes = barcodes[
             subWindowNum * subWindowUpper : (subWindowNum + 1) * subWindowUpper
         ]
-        generateOneSubWindow(subWindowPath, subWindowBarcodes)
+        if len(subWindowBarcodes) > 0:
+            generateOneSubWindow(subWindowPath, subWindowBarcodes)
 
 
 def generateOneSubWindow(subWindowPath, barcodes):

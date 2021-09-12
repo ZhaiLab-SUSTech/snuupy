@@ -39,6 +39,8 @@ def parseOneReadToWindow(read, window, upperLimit, outputPath, byPrimer):
         unmappedBase, primerCat = read.get_tag('PS'), read.get_tag('PC')
         name = f'{name}_byPrimer_{primerCat}'
         content = f'>{name}\n{unmappedBase}\n'
+        if len(unmappedBase) <= 20:
+            return None
 
     else:
         unmappedBaseE, unmappedBaseLengthE = read.get_tag('ES'), read.get_tag('EL')

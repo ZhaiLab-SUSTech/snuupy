@@ -8,6 +8,7 @@ from more_itertools import chunked
 from concurrent.futures import ProcessPoolExecutor
 from itertools import repeat
 import math
+from typing import List
 
 
 def getMaxSeedLength(x):
@@ -59,19 +60,25 @@ def alignByVmatch(
         assert False, "triger error during alignment"
 
 
-def buildIndex(ls_nanoporeFa, seedLength, dir_vmatch):
+def buildIndex(ls_nanoporeFa, seedLength, dir_vmatch) -> List[str]:
     ls_cmd = []
+    lsPath_removedFa = []
     for path_nanoporeFa in ls_nanoporeFa:
         fa_nanopore = FastaContent(path_nanoporeFa)
         fa_counts = sum([len(x.seq) for x in fa_nanopore.iter()])
+        if fa_counts <= 20:
+            lsPath_removedFa.append(path_nanoporeFa)
+            continue
         _seedLength = int(min(seedLength, getMaxSeedLength(fa_counts)))
+        _seedLength = max(1, _seedLength)
         ls_cmd.append(
             f"{dir_vmatch}/mkvtree -db {path_nanoporeFa} -dna -pl {_seedLength} -allout -indexname {path_nanoporeFa}"
         )
 
     cmd = " && ".join(ls_cmd)
     if os.system(cmd) != 0:
-        assert False, "triger error during build index"
+        assert False, f"triger error during build index: {cmd}"
+    return lsPath_removedFa
 
 
 def main(
@@ -95,8 +102,8 @@ def main(
         for name in os.listdir(f"{dir_nanopore}/{chrName}"):
             ls_allNanoporeFa.append("/".join([*ls_chrPath, name]))
 
-    iterLs_NanoporeFa = chunked(ls_allNanoporeFa, 128)
-    iterCounts = (len(ls_allNanoporeFa) // 128) + 1
+    iterLs_NanoporeFa = chunked(ls_allNanoporeFa, 64)
+    iterCounts = (len(ls_allNanoporeFa) // 64) + 1
 
     with ProcessPoolExecutor(min(threads, 4)) as mtp:
         ls_results = list(
@@ -111,6 +118,8 @@ def main(
                 total=iterCounts,
             )
         )
+    stPath_removedFa = set([y for x in ls_results for y in x])
+    ls_allNanoporeFa = [x for x in ls_allNanoporeFa if x not in stPath_removedFa]
 
     dir_tempOutput = f"{dir_output}/temp/"
     sh.mkdir(dir_output, p=True)
