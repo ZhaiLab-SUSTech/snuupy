@@ -190,6 +190,8 @@ class FastaContent:
     def __readFasta(self):
         with open(self.path, "r") as fh:
             i = 0
+            readName = ''
+            readSeq = ''
             while True:
                 lineContent = fh.readline().strip()
                 if lineContent == "":

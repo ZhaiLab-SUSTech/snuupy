@@ -182,7 +182,8 @@ def _generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, COLUMN, BY
 @click.option("--umi-ed", "UMI_ED", default=2, help="UMI edit distance", type=int, show_default=True)
 @click.option("--by-vmatch", "BY_VMATCH", is_flag=True, help="use vmatch take place of BLAST")
 @click.option("--seed-length", "SEED_LENGTH", default=6, help='seed length', show_default=True)
-def _windowBlast(ILLUMINA_DIR, NANOPORE_DIR, RESULT_DIR, THREADS, SOFT_PATH, KIT, BY_VMATCH, BARCODE_ED, UMI_ED, SEED_LENGTH):
+@click.option("--batch", "N_BATCH", default=128, type=int, help="batch counts")
+def _windowBlast(ILLUMINA_DIR, NANOPORE_DIR, RESULT_DIR, THREADS, SOFT_PATH, KIT, BY_VMATCH, BARCODE_ED, UMI_ED, SEED_LENGTH, N_BATCH):
     """
     blast find potential UMI/Bc
     """
@@ -194,7 +195,7 @@ def _windowBlast(ILLUMINA_DIR, NANOPORE_DIR, RESULT_DIR, THREADS, SOFT_PATH, KIT
         windowBlast(ILLUMINA_DIR, NANOPORE_DIR, RESULT_DIR, THREADS, SOFT_PATH, KIT)
     else:
         from scripts.windowBlast_byVmatch import main as windowBlast
-        windowBlast(ILLUMINA_DIR, NANOPORE_DIR, RESULT_DIR, SOFT_PATH, THREADS, KIT, BARCODE_ED, UMI_ED, SEED_LENGTH)
+        windowBlast(ILLUMINA_DIR, NANOPORE_DIR, RESULT_DIR, SOFT_PATH, THREADS, KIT, BARCODE_ED, UMI_ED, SEED_LENGTH, N_BATCH)
 
 
 @main.command("getMismatch")
