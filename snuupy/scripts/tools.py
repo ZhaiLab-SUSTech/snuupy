@@ -16,6 +16,7 @@ from loguru import logger
 import pickle
 import lmdb
 import anndata
+from more_itertools import chunked
 
 
 def getBlock(read, intron):
@@ -755,3 +756,20 @@ def transformEntToAd(ent):
         )
     }
     return mofaAd
+
+def readSerialization(bam, n_batch):
+    dt_header = bam.header.to_dict()
+    it_reads = chunked(bam, n_batch)
+    for ls_read in it_reads:
+        yield dt_header, [x.to_string() for x in ls_read]
+
+def readDeserialization(dt_header, ls_read):
+    return_single = False
+    if isinstance(ls_read, str):
+        return_single = True
+        ls_read = [ls_read]
+    header = pysam.AlignmentHeader.from_dict(dt_header)
+    ls_read = [pysam.AlignedSegment.fromstring(x, header) for x in ls_read]
+    if return_single:
+        ls_read = ls_read[0]
+    return ls_read

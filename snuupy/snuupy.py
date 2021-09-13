@@ -130,7 +130,8 @@ def _generateIlluminaWindowFromKb(
     "--in-disk", "IN_DISK", is_flag=True, help="store sequences on disk instead of mem"
 )
 @click.option("--by-primer", "BY_PRIMER", is_flag=True, help="Extraction of region between primers and aligned sequences")
-def _addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK, BY_PRIMER):
+@click.option("-t", "THREADS", type=int, default=1, help='threads')
+def _addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK, BY_PRIMER, THREADS):
     """
     \b
     get unmapped base tag
@@ -142,7 +143,7 @@ def _addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK, BY_PRIM
     
     else:
         from scripts.addUnmappedBaseTag_needPrimer import main as addUnmappedBaseTag
-        addUnmappedBaseTag(BAM_PATH, BAM_PATH_OUT)
+        addUnmappedBaseTag(BAM_PATH, BAM_PATH_OUT, THREADS)
 
 
 @main.command("generateNanoporeWindow")
