@@ -101,7 +101,7 @@ def processOneChunk(
             logger.warning(f"detect error when process {umiWithReadId[0]}")
     commandExecutedCmd = " ;\\\n".join(commandExecutedCmdLs)
     os.system(commandExecutedCmd)
-    logger.info(f"{i*32} UMIs processed; total {totalUmiCounts}")
+    logger.info(f"{i*64} UMIs processed; total {totalUmiCounts}")
 
 
 def polishReads(
@@ -138,7 +138,7 @@ def polishReads(
 
     logger.info('start polish')
     totalUmiCounts = len(sameUmiReadDt)
-    umiWithReadIdLsIter = chunked(sameUmiReadDt.items(), 32)
+    umiWithReadIdLsIter = chunked(sameUmiReadDt.items(), 64)
     allResults = []
     with ProcessPoolExecutor(threads) as multiP:
         for i, umiWithReadIdLs in enumerate(umiWithReadIdLsIter):
@@ -164,6 +164,6 @@ def polishReads(
     cat {finalResultsDir}* | {seqkitPath} seq -rp > {polishedRead} && sleep 15 &&\
     mkdir /tmp/empty &&\
     rsync --delete-before -av /tmp/empty/ {finalResultsDir}/ &&\
-    rsync --delete-before -av /tmp/empty/ {tempResultsDir}/ &&\
+    rsync --delete-before -av /tmp/empty/ {tempResultsDir}/ 
     """
     )
