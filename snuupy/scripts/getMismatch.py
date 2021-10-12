@@ -5,6 +5,7 @@ from .tools import sequence as jseq
 from Bio import Align
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor
+from joblib import Parallel, delayed
 from more_itertools import chunked
 from tqdm import tqdm
 
@@ -19,28 +20,31 @@ def getAlignScore(line):
     aligner.query_gap_score = -1
     aligner.target_end_gap_score = 0
 
-    barcodeUmi = barcodeUmi.split("_")
-    barcode = barcodeUmi[0]
-    umi = barcodeUmi[1]
-    barcodeUmi = "".join(barcodeUmi)
+    try:
+        barcodeUmi = barcodeUmi.split("_")
+        barcode = barcodeUmi[0]
+        umi = barcodeUmi[1]
+        barcodeUmi = "".join(barcodeUmi)
 
-    mappingResult = [aligner.align(barcodeUmi, x) for x in unmappedSeq]
-    mappingScore = [x.score for x in mappingResult]
-    barcodeUmiScore = max(mappingScore)
-    bestScoreIndex = mappingScore.index(barcodeUmiScore)
-    if bestScoreIndex % 2 == 0:
-        mappingStrand = 0
-    else:
-        mappingStrand = 1
+        mappingResult = [aligner.align(barcodeUmi, x) for x in unmappedSeq]
+        mappingScore = [x.score for x in mappingResult]
+        barcodeUmiScore = max(mappingScore)
+        bestScoreIndex = mappingScore.index(barcodeUmiScore)
+        if bestScoreIndex % 2 == 0:
+            mappingStrand = 0
+        else:
+            mappingStrand = 1
 
-    bestAlign = mappingResult[bestScoreIndex][0]
-    seqAlignedSeq = bestAlign.query[
-        bestAlign.aligned[1][0][0] : bestAlign.aligned[1][-1][-1]
-    ]
+        bestAlign = mappingResult[bestScoreIndex][0]
+        seqAlignedSeq = bestAlign.query[
+            bestAlign.aligned[1][0][0] : bestAlign.aligned[1][-1][-1]
+        ]
 
-    barcodeScore = aligner.align(barcode, seqAlignedSeq).score
-    umiScore = barcodeUmiScore - barcodeScore
-    return [str(x) for x in [barcodeUmiScore, barcodeScore, umiScore, mappingStrand]]
+        barcodeScore = aligner.align(barcode, seqAlignedSeq).score
+        umiScore = barcodeUmiScore - barcodeScore
+        return [str(x) for x in [barcodeUmiScore, barcodeScore, umiScore, mappingStrand]]
+    except:
+        assert False, f"Trigger error during process barcode: {barcodeUmi}, Corresponding unmapped seq: {';'.join(unmappedSeq)}"
 
 
 def getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER, BY_VMATCH):
@@ -119,9 +123,13 @@ def getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIME
     )
     alignResult = []
     for chunkBlastResult in tqdm(iterBlastResult, 'get align score', total=(len(blastResult) // (THREADS * 5000 * 2) + 1)):
-        with ProcessPoolExecutor(THREADS) as multiP:
-            subAlignResult = multiP.map(getAlignScore, chunkBlastResult, chunksize=5000)
-        alignResult.extend(list(subAlignResult))
+        _ls = Parallel(THREADS, batch_size=1000)(
+            delayed(getAlignScore)(x) for x in chunkBlastResult
+        )
+        alignResult.extend(_ls)
+        # with ProcessPoolExecutor(THREADS) as multiP:
+        #     subAlignResult = multiP.map(getAlignScore, chunkBlastResult, chunksize=5000)
+        # alignResult.extend(list(subAlignResult))
 
     blastResult["alignResult"] = alignResult
     blastResult["barcodeUmiScore"] = blastResult["alignResult"].str[0].astype(float)
