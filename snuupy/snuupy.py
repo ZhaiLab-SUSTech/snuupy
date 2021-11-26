@@ -47,6 +47,7 @@ def _generateIlluminaWindow(ILLUMINA_INDEX, OUT_DIR):
     """
     from scripts.generateIlluminaWindow import generateIlluminaWindow
     import sh
+
     sh.mkdir(OUT_DIR, p=True)
 
     generateIlluminaWindow(ILLUMINA_INDEX, OUT_DIR)
@@ -110,6 +111,7 @@ def _generateIlluminaWindowFromKb(
     """
     from scripts.generateIlluminaWindowFromKb import generateIlluminaWindowFromKb
     import sh
+
     sh.mkdir(OUT_DIR, p=True)
     generateIlluminaWindowFromKb(
         t2gPath,
@@ -129,9 +131,16 @@ def _generateIlluminaWindowFromKb(
 @click.option(
     "--in-disk", "IN_DISK", is_flag=True, help="store sequences on disk instead of mem"
 )
-@click.option("--by-primer", "BY_PRIMER", is_flag=True, help="Extraction of region between primers and aligned sequences")
-@click.option("-t", "THREADS", type=int, default=1, help='threads')
-def _addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK, BY_PRIMER, THREADS):
+@click.option(
+    "--by-primer",
+    "BY_PRIMER",
+    is_flag=True,
+    help="Extraction of region between primers and aligned sequences",
+)
+@click.option("-t", "THREADS", type=int, default=1, help="threads")
+def _addUnmappedBaseTag(
+    BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK, BY_PRIMER, THREADS
+):
     """
     \b
     get unmapped base tag
@@ -140,9 +149,10 @@ def _addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK, BY_PRIM
         from scripts.addUnmappedBaseTag import addUnmappedBaseTag
 
         addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK)
-    
+
     else:
         from scripts.addUnmappedBaseTag_needPrimer import main as addUnmappedBaseTag
+
         addUnmappedBaseTag(BAM_PATH, BAM_PATH_OUT, THREADS)
 
 
@@ -159,13 +169,21 @@ def _addUnmappedBaseTag(BAM_PATH, NANOPORE_FASTA, BAM_PATH_OUT, IN_DISK, BY_PRIM
 @click.option("-b", "BAM_PATH", help="bam added unmapped base tag ; format bam")
 @click.option("-o", "OUT_PATH", help="output dir; end with / ")
 @click.option("-w", "WINDOW", type=int, help="window size, same as Illumina")
-@click.option("--by-primer", "BY_PRIMER", is_flag=True, help="Extraction of region between primers and aligned sequences")
-def _generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, COLUMN, BY_PRIMER):
+@click.option(
+    "--by-primer",
+    "BY_PRIMER",
+    is_flag=True,
+    help="Extraction of region between primers and aligned sequences",
+)
+def _generateNanoporeWindow(
+    GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, COLUMN, BY_PRIMER
+):
     """
     output nanopore reads based on mapping info
     """
     from scripts.generateNanoporeWindow import generateNanoporeWindow
     import sh
+
     sh.mkdir(OUT_PATH, p=True)
     generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, COLUMN, BY_PRIMER)
 
@@ -179,24 +197,68 @@ def _generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, COLUMN, BY
 @click.option(
     "--kit", "KIT", default="v2", help="10x kit version; v2|v3", show_default=True
 )
-@click.option("--bc-ed", "BARCODE_ED", default=3, help="barcode edit distance", type=int, show_default=True)
-@click.option("--umi-ed", "UMI_ED", default=2, help="UMI edit distance", type=int, show_default=True)
-@click.option("--by-vmatch", "BY_VMATCH", is_flag=True, help="use vmatch take place of BLAST")
-@click.option("--seed-length", "SEED_LENGTH", default=6, help='seed length', show_default=True)
+@click.option(
+    "--bc-ed",
+    "BARCODE_ED",
+    default=3,
+    help="barcode edit distance",
+    type=int,
+    show_default=True,
+)
+@click.option(
+    "--umi-ed",
+    "UMI_ED",
+    default=2,
+    help="UMI edit distance",
+    type=int,
+    show_default=True,
+)
+@click.option(
+    "--by-vmatch", "BY_VMATCH", is_flag=True, help="use vmatch take place of BLAST"
+)
+@click.option(
+    "--seed-length", "SEED_LENGTH", default=6, help="seed length", show_default=True
+)
 @click.option("--batch", "N_BATCH", default=128, type=int, help="batch counts")
-def _windowBlast(ILLUMINA_DIR, NANOPORE_DIR, RESULT_DIR, THREADS, SOFT_PATH, KIT, BY_VMATCH, BARCODE_ED, UMI_ED, SEED_LENGTH, N_BATCH):
+def _windowBlast(
+    ILLUMINA_DIR,
+    NANOPORE_DIR,
+    RESULT_DIR,
+    THREADS,
+    SOFT_PATH,
+    KIT,
+    BY_VMATCH,
+    BARCODE_ED,
+    UMI_ED,
+    SEED_LENGTH,
+    N_BATCH,
+):
     """
     blast find potential UMI/Bc
     """
-    
+
     import sh
+
     sh.mkdir(RESULT_DIR, p=True)
     if not BY_VMATCH:
         from scripts.windowBlast import windowBlast
+
         windowBlast(ILLUMINA_DIR, NANOPORE_DIR, RESULT_DIR, THREADS, SOFT_PATH, KIT)
     else:
         from scripts.windowBlast_byVmatch import main as windowBlast
-        windowBlast(ILLUMINA_DIR, NANOPORE_DIR, RESULT_DIR, SOFT_PATH, THREADS, KIT, BARCODE_ED, UMI_ED, SEED_LENGTH, N_BATCH)
+
+        windowBlast(
+            ILLUMINA_DIR,
+            NANOPORE_DIR,
+            RESULT_DIR,
+            SOFT_PATH,
+            THREADS,
+            KIT,
+            BARCODE_ED,
+            UMI_ED,
+            SEED_LENGTH,
+            N_BATCH,
+        )
 
 
 @main.command("getMismatch")
@@ -207,15 +269,26 @@ def _windowBlast(ILLUMINA_DIR, NANOPORE_DIR, RESULT_DIR, THREADS, SOFT_PATH, KIT
 @click.option(
     "--kit", "KIT", default="v2", help="10x kit version; v2|v3", show_default=True
 )
-@click.option("--by-primer", "BY_PRIMER", is_flag=True, help="Extraction of region between primers and aligned sequences")
-@click.option("--by-vmatch", "BY_VMATCH", is_flag=True, help="use vmatch take place of BLAST")
-def _getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER, BY_VMATCH):
+@click.option(
+    "--by-primer",
+    "BY_PRIMER",
+    is_flag=True,
+    help="Extraction of region between primers and aligned sequences",
+)
+@click.option(
+    "--by-vmatch", "BY_VMATCH", is_flag=True, help="use vmatch take place of BLAST"
+)
+def _getMismatch(
+    MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER, BY_VMATCH
+):
     """
     calculate mismatch based on blast results
     """
     from scripts.getMismatch import getMismatch
 
-    getMismatch(MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER, BY_VMATCH)
+    getMismatch(
+        MAPPING_RESULT, ADD_SEQ_BAM, OUT_FEATHER, THREADS, KIT, BY_PRIMER, BY_VMATCH
+    )
 
 
 @main.command("barcodeAssignment")
@@ -416,13 +489,14 @@ def _addPolyATag(
 @click.option("--out-dir", "out_suffix", required=True, help="out dir; ends with /")
 @click.option("-t", "--threads", required=False, help="threads", default=10)
 @click.option("--fasta", "fastaPath", help="genome fa")
-def _polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads):
+@click.option("--bed12", "is_bed12", is_flag=True, help="is bed12 format or not")
+def _polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads, is_bed12):
     """
     detect PolyA Cluster
     """
     from scripts.polyAClusterDetected import polyAClusterDetected
 
-    polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads)
+    polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads, is_bed12)
 
 
 @main.command("generateMtx")
@@ -459,29 +533,31 @@ def _polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads):
     "onlyFullLength",
     default=True,
     show_default=True,
-    help="only use full length generate splice matrix or not",
+    help="only use full length transcripts to generate splice matrix or not",
 )
 @click.option(
     "--out-nanopore",
     "outMtxDirPath",
-    help="matrics including nanopore expression matrix; apa matrix; splicing mtx; end with /",
+    help="deprecated, matrics including nanopore expression matrix; apa matrix; splicing mtx; end with /",
 )
 @click.option(
     "--out-illumina",
     "illuminaMtxDirPath",
-    help="matrics including illumina expression matrix; apa matrix; splicing mtx; end with /",
+    help="deprecated, matrics including illumina expression matrix; apa matrix; splicing mtx; end with /",
 )
+@click.option("--out-h5mu", "h5muPath", help="matrics including all sub-matrix")
 def _generateMtx(
     apaClusterPath,
     inBamPath,
     geneTag,
     inIrInfoPath,
-    outMtxDirPath,
-    illuminaMtxDirPath,
     irMode,
     intronList,
     illuminaEx,
     onlyFullLength,
+    h5muPath,
+    outMtxDirPath,
+    illuminaMtxDirPath,
 ):
     """
     generate matrices
@@ -493,12 +569,13 @@ def _generateMtx(
         inBamPath,
         geneTag,
         inIrInfoPath,
-        outMtxDirPath,
-        illuminaMtxDirPath,
         irMode,
         intronList,
         illuminaEx,
         onlyFullLength,
+        h5muPath,
+        outMtxDirPath,
+        illuminaMtxDirPath,
     )
 
 

@@ -32,11 +32,11 @@ def generateOneSubWindow(subWindowPath, barcodes):
 
 
 def generateIlluminaWindow(ILLUMINA_INDEX, OUT_DIR):
-    os.system(f"mkdir {OUT_DIR}")
+    os.system(f"mkdir -p {OUT_DIR}")
     parsedIndex = h5py.File(ILLUMINA_INDEX, "r")
     for chr_ in parsedIndex.keys():
         currentChr = OUT_DIR + chr_ + "/"
-        os.system(f"mkdir {currentChr}")
+        os.system(f"mkdir -p {currentChr}")
         for singleWindow in parsedIndex[chr_].keys():
             currentWindowPath = currentChr + singleWindow + "/"
             windowBarcodes = parsedIndex[f"{chr_}/{singleWindow}"][()].astype(str)

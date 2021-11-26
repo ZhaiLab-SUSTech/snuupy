@@ -78,6 +78,6 @@ def generateNanoporeWindow(GENOME_INDEX, BAM_PATH, OUT_PATH, WINDOW, useColumn, 
     with ThreadPoolExecutor(2) as multiT:
         sh.mkdir(OUT_PATH, p=True)
         for chr_, upperLimit in genomeUpper.items():
-            bamChrFetch = pysam.AlignmentFile(BAM_PATH).fetch(chr_)
+            bamChrFetch = pysam.AlignmentFile(BAM_PATH).fetch(str(chr_))
             outputPath = f'{OUT_PATH}{chr_}/'
             multiT.submit(parseOneChr, chr_, bamChrFetch, WINDOW, upperLimit, outputPath, byPrimer)

@@ -29,6 +29,7 @@ def parseIllumina(
     genomeIndex = pd.read_csv(genomeIndex, sep="\t", header=None).iloc[
         :useColumn
     ]  # remove mito and chlo
+    genomeIndex[0] = genomeIndex[0].astype(str) # compatible with ensemble format
     secondIndex = pd.read_csv(secondIndex, header=None)
     secondIndex[0] = secondIndex[0].str.split("-", expand=True)[0]
     secondIndex = set(secondIndex[0])

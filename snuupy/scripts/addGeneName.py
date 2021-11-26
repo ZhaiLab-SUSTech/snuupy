@@ -97,7 +97,7 @@ def addGeneName(inBamPath, bedAnno, outfile, bedtoolsPath, outBamPath, geneIdTag
 
     logger.info("Main function")
 
-    df["geneName"] = df["geneName"].str.split("\|\|").str[0]
+    df["geneName"] = df["geneName"].str.split("\|").str[-1]
     specificLine = df["geneName"].str.endswith("_specific")
     specificDf = df.loc[specificLine]
     isoformDf = df.loc[~specificLine]
@@ -127,7 +127,7 @@ def addGeneName(inBamPath, bedAnno, outfile, bedtoolsPath, outBamPath, geneIdTag
         # Take the one with the greatest exon coverage as the gene annotation of this read
         if results[item.Name]["cov"] < item.cov:
             results[item.Name]["cov"] = item.cov
-            results[item.Name]["gene_id"] = item.geneName.split(".")[0]
+            results[item.Name]["gene_id"] = item.geneName
             results[item.Name]["gene_len"] = item.geneEnd - item.geneStart
 
     logger.info("Gene Assign Done!")

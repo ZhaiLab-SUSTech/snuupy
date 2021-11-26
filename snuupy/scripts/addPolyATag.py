@@ -45,21 +45,15 @@ def addPolyATag(
     outAdapter = tempDir + "adapter.tsv"
     polyACallerResults = tempDir + "polyACaller.tsv"
 
-    os.system(f"{minimapPath} -t {threads} -ax splice --secondary=no -G 12000 {genome} {infile} |\
-        {samtoolsPath} sort -@ {threads} -o {outBam} - &&\
-            {samtoolsPath} index -@ {threads} {outBam}")
+    if os.path.exists(polyACallerResults):
+        pass
+    else:
+        os.system(f"{minimapPath} -t {threads} -ax splice --secondary=no -G 12000 {genome} {infile} |\
+            {samtoolsPath} sort -@ {threads} -o {outBam} - &&\
+                {samtoolsPath} index -@ {threads} {outBam}")
 
-    adapterFinder(outBam, infile, outAdapter, threads)
-    polyACaller(outAdapter, f5summary, f5dir, polyACallerResults, threads)
-
-    umiReadMapDt = pd.read_feather(featherPath)
-    mapNameToId = (
-        umiReadMapDt.loc[:, ["qseqid", "name"]].set_index("name").to_dict()["qseqid"]
-    )
-    umiReadMapDt = (
-        umiReadMapDt.groupby("qseqid")["name"].agg(lambda x: list(x)).to_dict()
-    )
-    umiLabel = set(umiReadMapDt.keys())
+        adapterFinder(outBam, infile, outAdapter, threads)
+        polyACaller(outAdapter, f5summary, f5dir, polyACallerResults, threads)
 
     addPolyAResult = (
         pd.read_table(polyACallerResults)
@@ -86,6 +80,16 @@ def addPolyATag(
         .set_index("readId", drop=False)
         .rename_axis("qname")
     )
+
+    umiReadMapDt = pd.read_feather(featherPath)
+    mapNameToId = (
+        umiReadMapDt.loc[:, ["qseqid", "name"]].set_index("name").to_dict()["qseqid"]
+    )
+    umiReadMapDt = (
+        umiReadMapDt.groupby("qseqid")["name"].agg(lambda x: list(x)).to_dict()
+    )
+    umiLabel = set(umiReadMapDt.keys())
+
     addPolyAResult = addPolyAResult.query('readType not in  ["invalid", "non-polyA/T"]')
     addPolyAResult["umiBarcode"] = addPolyAResult.index.map(mapNameToId)
     addPolyAResult = addPolyAResult.loc[:, ["umiBarcode", "tailLength"]]
@@ -98,7 +102,7 @@ def addPolyATag(
     outBamFile = pysam.AlignmentFile(addPolyAFilePath, "wb", template=bamFile)
 
     for read in bamFile:
-        readUmiBarcode = read.qname[:27]
+        readUmiBarcode = '_'.join(read.qname.split('_')[:2])
         polyALength = addPolyAResult[readUmiBarcode]
         read.set_tag(polyATag, polyALength, "f")
         outBamFile.write(read)

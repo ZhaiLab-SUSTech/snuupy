@@ -13,7 +13,10 @@ import pysam
 import portion
 from collections import defaultdict
 from loguru import logger
-from .tools import transformExpressionMatrixTo10XMtx
+from collections import defaultdict
+from tqdm import tqdm
+import scipy.sparse as ss
+import muon as mu
 
 
 def parseReadApaInfo(apaClusterPath, inBamPath, geneTag, expressionInfo):
@@ -21,6 +24,7 @@ def parseReadApaInfo(apaClusterPath, inBamPath, geneTag, expressionInfo):
     parse APA information, and classify each read into corresponding PAC
     """
     apaCluster = pr.read_bed(apaClusterPath, True)
+    apaCluster["Chromosome"] = apaCluster["Chromosome"].astype(str)
     apaCluster["Name"] = apaCluster["Name"] + "_APA"
     apaCluster["geneName"] = apaCluster["Name"].str.split("_").str[0]
     apaCluster = apaCluster.reindex(["geneName", "Name", "Start", "End"], axis=1)
@@ -61,22 +65,22 @@ def parseReadApaInfo(apaClusterPath, inBamPath, geneTag, expressionInfo):
     return expressionInfo
 
 
-def replaceNanoporeExpressionByIllumina(illuminaEx, nanoporeEx, nanoporeCorrectMtx):
-    if illuminaEx.endswith(".h5"):
-        illuAdata = sc.read_10x_h5(illuminaEx, genome=None, gex_only=True)
-    elif illuminaEx.endswith(".h5ad"):
-        illuAdata = sc.read_h5ad(illuminaEx)
-    else:
-        logger.error("Ambiguous Format !!!")
-        0 / 0
-    nanoAdata = sc.read_10x_mtx(nanoporeEx)
-    illuEx = illuAdata.to_df()
-    nanoEx = nanoAdata.to_df()
-    nanoEx = nanoEx.loc[:, nanoEx.columns.str.find("_") != -1]
-    nanoEx = nanoEx.join(illuEx, how="right")
-    nanoEx.fillna(0, inplace=True)
-    nanoEx.index = nanoEx.index.str.split("-").str[0]
-    transformExpressionMatrixTo10XMtx(nanoEx, nanoporeCorrectMtx)
+# def replaceNanoporeExpressionByIllumina(illuminaEx, nanoporeEx, nanoporeCorrectMtx):
+#     if illuminaEx.endswith(".h5"):
+#         illuAdata = sc.read_10x_h5(illuminaEx, genome=None, gex_only=True)
+#     elif illuminaEx.endswith(".h5ad"):
+#         illuAdata = sc.read_h5ad(illuminaEx)
+#     else:
+#         logger.error("Ambiguous Format !!!")
+#         0 / 0
+#     nanoAdata = sc.read_10x_mtx(nanoporeEx)
+#     illuEx = illuAdata.to_df()
+#     nanoEx = nanoAdata.to_df()
+#     nanoEx = nanoEx.loc[:, nanoEx.columns.str.find("_") != -1]
+#     nanoEx = nanoEx.join(illuEx, how="right")
+#     nanoEx.fillna(0, inplace=True)
+#     nanoEx.index = nanoEx.index.str.split("-").str[0]
+#     transformExpressionMatrixTo10XMtx(nanoEx, nanoporeCorrectMtx)
 
 
 def generateMtx(
@@ -84,16 +88,21 @@ def generateMtx(
     inBamPath,
     geneTag,
     inIrInfoPath,
-    outMtxDirPath,
-    illuminaMtxDirPath,
     irMode,
     intronList,
     illuminaEx,
     onlyFullLength,
+    h5muPath=None,
+    outMtxDirPath=None,
+    illuminaMtxDirPath=None,
 ):
     """
-    generate expression mtx (format 10x)
+    generate expression mtx (format h5mu)
     """
+    if not h5muPath:
+        h5muPath = illuminaMtxDirPath.rstrip("/") + ".h5mu"
+        logger.warning(f"argument `illuminaMtxDirPath` is deprecated, output file will be redirected to `{h5muPath}`")
+
     mode = []
     if (apaClusterPath != "False") & (inBamPath != "False"):
         mode.append("apa")
@@ -133,7 +142,6 @@ def generateMtx(
             useIntronDict = dict(useIntronDict)
         else:
             useIntronDict = False
-
 
         def getIntronSpliceInfo(line):
             if onlyFullLength:
@@ -187,11 +195,45 @@ def generateMtx(
     expressionInfo.reset_index(inplace=True)
     expressionInfo.columns = ["BcUmi", "expressionInfo"]
     expressionInfo["Bc"] = expressionInfo["BcUmi"].str.split("_").str[0]
-    expressionInfo = expressionInfo.groupby("Bc")["expressionInfo"].apply(
-        pd.value_counts
+
+    ls_bc = expressionInfo["Bc"].unique().tolist()
+    ls_feature = expressionInfo["expressionInfo"].unique().tolist()
+
+    dt_bc = {x: i for i, x in enumerate(ls_bc)}
+    dt_feature = {x: i for i, x in enumerate(ls_feature)}
+
+    ls_mtx = [[0 for x in ls_feature] for y in tqdm(ls_bc, "generate matrix content")]
+    for line in tqdm(expressionInfo.itertuples(), total=len(expressionInfo)):
+        ls_mtx[dt_bc[line.Bc]][dt_feature[line.expressionInfo]] += 1
+    logger.info("transfer mtx format to sparse.matrix")
+    ss_mtx = ss.csr_matrix(ls_mtx)
+    ad_mtx = sc.AnnData(
+        ss_mtx, obs=pd.DataFrame(index=ls_bc), var=pd.DataFrame(index=ls_feature)
     )
-    expressionInfo = expressionInfo.unstack().fillna(0).astype(int)
+    ad_mtx.obs.index = ad_mtx.obs.index + "-1"
+    ad_mtx = ad_mtx[sorted(ad_mtx.obs.index)]
 
-    transformExpressionMatrixTo10XMtx(expressionInfo, outMtxDirPath)
+    logger.info("generate mudata matrix")
+    ad_illumina = sc.read_10x_h5(illuminaEx, genome=None, gex_only=True)
+    ad_illumina.var_names_make_unique()
+    ad_nanopore = ad_mtx[:, ~ad_mtx.var.index.str.contains(r"APA|fullySpliced")]
+    ad_apa = ad_mtx[:, ad_mtx.var.index.str.contains(r"APA")]
+    ad_splice = ad_mtx[:, ad_mtx.var.index.str.contains(r"fullySpliced")]
+    dt_allAd = dict(
+        illuminaAbu=ad_illumina, nanoporeAbu=ad_nanopore, apa=ad_apa, splice=ad_splice
+    )
+    if ad_apa.shape[1] == 0:
+        del dt_allAd["ad_apa"]
+    if ad_splice.shape[1] == 0:
+        del dt_allAd["ad_splice"]
+    md = mu.MuData(dt_allAd)
+    md.write_h5mu(h5muPath)
 
-    replaceNanoporeExpressionByIllumina(illuminaEx, outMtxDirPath, illuminaMtxDirPath)
+    # expressionInfo = expressionInfo.groupby("Bc")["expressionInfo"].apply(
+    #     pd.value_counts
+    # )
+    # expressionInfo = expressionInfo.unstack().fillna(0).astype(int)
+
+    # transformExpressionMatrixTo10XMtx(expressionInfo, outMtxDirPath)
+
+    # replaceNanoporeExpressionByIllumina(illuminaEx, outMtxDirPath, illuminaMtxDirPath)

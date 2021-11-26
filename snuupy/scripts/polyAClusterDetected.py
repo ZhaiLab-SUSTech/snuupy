@@ -133,6 +133,7 @@ def get_three_end(infile, gene_id, gene_model):
 def filterPAC(fastaPath, bedPath, bedSummitPath, fillterPolyASitePath):
     genomeFa = pyfastx.Fasta(fastaPath)
     polyAClusterBed = pr.read_bed(bedSummitPath, True)
+    polyAClusterBed['Chromosome'] = polyAClusterBed['Chromosome'].astype(str)
     polyAClusterBed["seq"] = polyAClusterBed.apply(
         lambda x: genomeFa[x["Chromosome"]][x["Start"] - 10 : x["End"] + 10].seq, axis=1
     )
@@ -148,19 +149,53 @@ def filterPAC(fastaPath, bedPath, bedSummitPath, fillterPolyASitePath):
     )
     usePolyASite = polyAClusterBed.query("Ratio <= 0.5")["Name"]
     polyAClusterRawRangeBed = pr.read_bed(bedPath, True)
+    polyAClusterRawRangeBed['Chromosome'] = polyAClusterRawRangeBed['Chromosome'].astype(str)
     polyAClusterPassedRangeBed = polyAClusterRawRangeBed.query("Name in @usePolyASite")
     polyAClusterPassedRangeBed.to_csv(
         fillterPolyASitePath, sep="\t", header=None, index=None
     )
 
 
-def polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads):
-    # 读取gene_bed信息
+def polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads, is_bed12=False):
     try:
         os.mkdir(out_suffix)
     except:
         logger.warning(f"{out_suffix} existed!")
     gene_model = pr.read_bed(gene_bed, as_df=True)
+    gene_model["Chromosome"] = gene_model["Chromosome"].astype(str)
+    if is_bed12:
+        # transfer bed12 to bed
+        gene_model = gene_model.assign(Gene = lambda df:df['Name'].str.split("\|").str[-1], GeneBiotype = lambda df:df['Name'].str.split("\|").str[-2])
+        gene_model = gene_model.groupby("Gene").agg(
+            {
+                "Chromosome": lambda x: x.iat[0],
+                "Start": "min",
+                "End": "max",
+                "Strand": lambda x: x.iat[0],
+                "GeneBiotype": lambda x: x.iat[0],
+            }
+        )
+        gene_model = gene_model.reset_index().pipe(lambda df:df.assign(
+            Name=df['Gene'] + '|' + df['GeneBiotype'] + '|' + df['Gene'],
+            Score=0,
+            ThickStart=df['Start'],
+            ThickEnd=df['End'],
+            ItemRGB=0.0,
+            BlockCount=1,
+            BlockSizes=(df['End']-df['Start']).astype(str) + ',',
+            BlockStarts='0,'
+        ))
+        gene_model = gene_model.reindex(
+            columns=[
+                "Chromosome",
+                "Start",
+                "End",
+                "Gene",
+                "Score",
+                "Strand",
+            ]
+        ).sort_values(['Chromosome', 'Start']).rename(columns={'Gene':'Name'})
+
     gene_model = gene_model.set_index(["Name"])
 
     results = []

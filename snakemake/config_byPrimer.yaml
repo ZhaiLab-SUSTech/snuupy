@@ -3,17 +3,25 @@ pipelineDir:
 resultDir:
   '/public/home/liuzj/publicPipeline/snuupy/example/snakemakeResults/'
 
-#inpuf files
+#input files
 rawNanoporeFa:
   '/public/home/liuzj/publicPipeline/snuupy/example/00_data/nanopore.fa'
+nanoporeWorkspace:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/workspace'
+nanoporeSeqSummary:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/nanoporeSeqSummary.txt'
 
 #genome files
 geneAnnoBed:
   '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/gene.bed'
+geneAnnoRepreBed:
+  '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/araport11.representative.gene_model.bed'
 genomeFa:
   '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa'
 genomeFai:
   '/public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa.fai'
+usedIntron:
+  '/data/Zhaijx/liuzj/data/Araport11/select_intron_by_Cyto.id.txt' # or False which means use all intron
 
 #softwares path
 minimap2Path:

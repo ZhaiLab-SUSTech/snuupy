@@ -14,8 +14,9 @@ df_runCellRanger = df_runCellRanger.assign(
     + "/outs/filtered_feature_bc_matrix/barcodes.tsv.gz",
     useBarcode=lambda df: df.index + "/outs/filtered_feature_bc_matrix/barcodes.tsv",
     cellRangerBam=lambda df: df.index + "/outs/possorted_genome_bam.bam",
+    illuminaMtx = lambda df: df.index + "/outs/filtered_feature_bc_matrix.h5",
 )
-for column in ['useBarcodeGz', 'useBarcode', 'cellRangerBam']:
+for column in ['useBarcodeGz', 'useBarcode', 'cellRangerBam', 'illuminaMtx']:
     df_runCellRanger[column] = resultDir + 'step1_runCellRanger/' + df_runCellRanger[column]
 
 
@@ -130,10 +131,72 @@ df_minimapMappingPolished = df_minimapMappingPolished.pipe(lambda df:df.assign(
 for column in ['mappingBam']:
     df_minimapMappingPolished[column] = resultDir + 'step11_minimapMappingPolished/' + df_minimapMappingPolished[column]
 
+
+## get parameter of rule `addGeneName` ##
+df_addGeneName = pd.DataFrame(index=["test"]).pipe(
+    lambda df: df.assign(
+        bedtoolsPath=config["bedtoolsPath"],
+        geneBed=config["geneAnnoBed"],
+        addGNPickle="addGNPickle.pickle",
+        addGNBam="addGNBam.bam",
+    )
+)
+for column in ['addGNPickle', 'addGNBam']:
+    df_addGeneName[column] = resultDir + 'step12_addGeneName/' + df_addGeneName[column]
+
+
+## get parameter of rule `getSpliceInfo` ##
+df_getSpliceInfo = pd.DataFrame(index=["test"]).assign(
+    splicingInfo="splicingInfo.tsv",
+    bedtoolsPath=config["bedtoolsPath"],
+    geneAnnoRepreBed = config['geneAnnoRepreBed'],
+)
+for column in ['splicingInfo']:
+    df_getSpliceInfo[column] = resultDir + 'step13_getSpliceInfo/' + df_getSpliceInfo[column]
+
+
+## get parameter of rule `addPolyATag` ##
+df_addPolyATag = pd.DataFrame(index=["test"]).assign(
+    addGNPABam="addGNPABam.bam",
+    polyACallerWorkDir="polyACallerWorkDir/",
+    nanoporeWorkspace=config["nanoporeWorkspace"],
+    nanoporeSeqSummary=config['nanoporeSeqSummary'],
+    geneAnnoBed = config['geneAnnoBed'],
+    minimap2Path = config['minimap2Path'],
+    genomeFa = config['genomeFa'],
+    rawNanoporeFa = config['rawNanoporeFa'],
+)
+for column in ['addGNPABam', 'polyACallerWorkDir']:
+    df_addPolyATag[column] = resultDir + 'step14_addPolyATag/' + df_addPolyATag[column]
+
+
+## get parameter of rule `polyAClusterDetected` ##
+df_polyAClusterDetected = pd.DataFrame(index=["test"]).assign(
+    polyAClusterDir="polyACluster/",
+    polyAClusterResult="polyACluster/polya_cluster.filtered.bed",
+    geneAnnoBed = config['geneAnnoBed'],
+    genomeFa = config['genomeFa'],
+)
+for column in ['polyAClusterDir', 'polyAClusterResult']:
+    df_polyAClusterDetected[column] = resultDir + 'step15_polyAClusterDetected/' + df_polyAClusterDetected[column]
+
+
+## get parameter of rule `generateMtx` ##
+df_generateMtx = pd.DataFrame(index=["test"]).assign(
+    h5muPath="result.h5mu",
+    usedIntron=config["usedIntron"],
+)
+for column in ['h5muPath']:
+    df_generateMtx[column] = resultDir + 'step16_generateMtx/' + df_generateMtx[column]
+
 rule all:
     input:
-        minimapMappingPolishedFinished = [resultDir + 'step11_minimapMappingPolished/' + "" + sample + ".finished" for sample in df_minimapMappingPolished.index],
+        generateMtxFinished = [resultDir + 'step16_generateMtx/' + "" + sample + ".finished" for sample in df_generateMtx.index],
 
+# parameter's dataframe of runCellRanger: 
+# |      | cellRangerConfig                                                           | useBarcodeGz                                         | useBarcode                                        | cellRangerBam                      | illuminaMtx                             |
+# |:-----|:---------------------------------------------------------------------------|:-----------------------------------------------------|:--------------------------------------------------|:-----------------------------------|:----------------------------------------|
+# | test | /public/home/liuzj/github/snuupy/removeExonRegion/cellRangerParameter.yaml | test/outs/filtered_feature_bc_matrix/barcodes.tsv.gz | test/outs/filtered_feature_bc_matrix/barcodes.tsv | test/outs/possorted_genome_bam.bam | test/outs/filtered_feature_bc_matrix.h5 |
 rule runCellRanger:
     input:
         cellRangerConfig = lambda wildcard: df_runCellRanger.at[wildcard.sample, 'cellRangerConfig'],
@@ -150,6 +213,10 @@ python ./removeExonRegion/removeExonRegion.py runCellRanger -p {input.cellRanger
 touch {output.runCellRangerFinished}
         """
 
+# parameter's dataframe of parseIllumina: 
+# |      |   windowSize | genomeFai                                                                           | parseIlluminaResults   |
+# |:-----|-------------:|:------------------------------------------------------------------------------------|:-----------------------|
+# | test |          500 | /public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa.fai | test.parsed.index      |
 rule parseIllumina:
     input:
         runCellRangerFinished = resultDir + 'step1_runCellRanger/' + '{sample}.finished',
@@ -173,6 +240,10 @@ python ./snuupy/snuupy.py parseIllumina --bam {params.cellRangerBam} --barcode {
 touch {output.parseIlluminaFinished}
         """
 
+# parameter's dataframe of minimapMappingRaw: 
+# |      | rawNanoporeFa                                                        | minimap2Path                                        | genomeFa                                                                        | geneAnnoBed                                                                    | outputBam                 |
+# |:-----|:---------------------------------------------------------------------|:----------------------------------------------------|:--------------------------------------------------------------------------------|:-------------------------------------------------------------------------------|:--------------------------|
+# | test | /public/home/liuzj/publicPipeline/snuupy/example/00_data/nanopore.fa | /public/home/liuzj/softwares/anaconda3/bin/minimap2 | /public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa | /public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/gene.bed | test.rawMappingResult.bam |
 rule minimapMappingRaw:
     input:
         rawNanoporeFa = lambda wildcard: df_minimapMappingRaw.at[wildcard.sample, 'rawNanoporeFa'],
@@ -193,6 +264,10 @@ cd {pipelineDir}
 touch {output.minimapMappingRawFinished}
         """
 
+# parameter's dataframe of addUnmappedBaseTag: 
+# |      | output           |
+# |:-----|:-----------------|
+# | test | test.addBase.bam |
 rule addUnmappedBaseTag:
     input:
         minimapMappingRawFinished = resultDir + 'step3_minimapMappingRaw/' + '{sample}.finished',
@@ -211,6 +286,10 @@ python ./snuupy/snuupy.py addUnmappedBaseTag --by-primer -i {params.outputBam} -
 touch {output.addUnmappedBaseTagFinished}
         """
 
+# parameter's dataframe of generateNanoporeWindow: 
+# |      | outputDir       |   windowSize | genomeFai                                                                           |
+# |:-----|:----------------|-------------:|:------------------------------------------------------------------------------------|
+# | test | test/outputDir/ |          500 | /public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa.fai |
 rule generateNanoporeWindow:
     input:
         addUnmappedBaseTagFinished = resultDir + 'step4_addUnmappedBaseTag/' + '{sample}.finished',
@@ -231,6 +310,10 @@ python ./snuupy/snuupy.py generateNanoporeWindow --by-primer --genome {params.ge
 touch {output.generateNanoporeWindowFinished}
         """
 
+# parameter's dataframe of generateIlluminaWindow: 
+# |      | illuminaDir     |
+# |:-----|:----------------|
+# | test | test/outputDir/ |
 rule generateIlluminaWindow:
     input:
         parseIlluminaFinished = resultDir + 'step2_parseIllumina/' + '{sample}.finished',
@@ -249,6 +332,10 @@ python ./snuupy/snuupy.py generateIlluminaWindow -i {params.parseIlluminaResults
 touch {output.generateIlluminaWindowFinished}
         """
 
+# parameter's dataframe of windowBlast: 
+# |      | dirResults   | blastPath                                                  | mergedResult                 |
+# |:-----|:-------------|:-----------------------------------------------------------|:-----------------------------|
+# | test | test/output/ | /public/home/liuzj/softwares/blast/ncbi-blast-2.10.0+/bin/ | test/output/allResult.result |
 rule windowBlast:
     input:
         generateIlluminaWindowFinished = resultDir + 'step6_generateIlluminaWindow/' + '{sample}.finished',
@@ -271,6 +358,10 @@ python ./snuupy/snuupy.py windowBlast --kit v3 -i {params.illuminaDir} -n {param
 touch {output.windowBlastFinished}
         """
 
+# parameter's dataframe of getMismatch: 
+# |      | nanoporeED              |
+# |:-----|:------------------------|
+# | test | test.nanoporeED.feather |
 rule getMismatch:
     input:
         windowBlastFinished = resultDir + 'step7_windowBlast/' + '{sample}.finished',
@@ -291,6 +382,10 @@ python ./snuupy/snuupy.py getMismatch --by-primer --kit v3 -i {params.mergedResu
 touch {output.getMismatchFinished}
         """
 
+# parameter's dataframe of barcodeAssignment: 
+# |      | nanoporeAssigned              |   barcodeED |   umiED |
+# |:-----|:------------------------------|------------:|--------:|
+# | test | test.nanoporeAssigned.feather |           3 |       3 |
 rule barcodeAssignment:
     input:
         getMismatchFinished = resultDir + 'step8_getMismatch/' + '{sample}.finished',
@@ -311,6 +406,10 @@ python ./snuupy/snuupy.py barcodeAssignment -i {params.nanoporeED} -o {params.na
 touch {output.barcodeAssignmentFinished}
         """
 
+# parameter's dataframe of polishReads: 
+# |      | rawFa                                                                | polishedFa       | dirTempRaw    | dirTempFinal    | path_seqkit                                       | path_racon                                         |
+# |:-----|:---------------------------------------------------------------------|:-----------------|:--------------|:----------------|:--------------------------------------------------|:---------------------------------------------------|
+# | test | /public/home/liuzj/publicPipeline/snuupy/example/00_data/nanopore.fa | test.polished.fa | test/tempRaw/ | test/tempFinal/ | /public/home/liuzj/softwares/anaconda3/bin/seqkit | /public/home/liuzj/softwares/racon/build/bin/racon |
 rule polishReads:
     input:
         barcodeAssignmentFinished = resultDir + 'step9_barcodeAssignment/' + '{sample}.finished',
@@ -336,6 +435,10 @@ python ./snuupy/snuupy.py polishReads -i {params.nanoporeAssigned} -f {params.ra
 touch {output.polishReadsFinished}
         """
 
+# parameter's dataframe of minimapMappingPolished: 
+# |      | mappingBam          | genomeFa                                                                        | geneAnnoBed                                                                    | path_minimap2                                       |
+# |:-----|:--------------------|:--------------------------------------------------------------------------------|:-------------------------------------------------------------------------------|:----------------------------------------------------|
+# | test | test.mappingBam.bam | /public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa | /public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/gene.bed | /public/home/liuzj/softwares/anaconda3/bin/minimap2 |
 rule minimapMappingPolished:
     input:
         polishReadsFinished = resultDir + 'step10_polishReads/' + '{sample}.finished',
@@ -355,6 +458,146 @@ rule minimapMappingPolished:
 cd {pipelineDir}
 {params.path_minimap2} -ax splice --secondary=no -uf --MD --sam-hit-only -t {threads} --junc-bed {params.geneAnnoBed} {params.genomeFa} {params.polishedFa} | samtools sort - -o {params.mappingBam} && samtools index {params.mappingBam}
 touch {output.minimapMappingPolishedFinished}
+        """
+
+# parameter's dataframe of addGeneName: 
+# |      | bedtoolsPath                                        | geneBed                                                                        | addGNPickle        | addGNBam     |
+# |:-----|:----------------------------------------------------|:-------------------------------------------------------------------------------|:-------------------|:-------------|
+# | test | /public/home/liuzj/softwares/anaconda3/bin/bedtools | /public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/gene.bed | addGNPickle.pickle | addGNBam.bam |
+rule addGeneName:
+    input:
+        minimapMappingPolishedFinished = resultDir + 'step11_minimapMappingPolished/' + '{sample}.finished',
+    output:
+        addGeneNameFinished = resultDir + 'step12_addGeneName/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        addGNPickle = lambda wildcard: df_addGeneName.at[wildcard.sample, 'addGNPickle'],
+        addGNBam = lambda wildcard: df_addGeneName.at[wildcard.sample, 'addGNBam'],
+        bedtoolsPath = lambda wildcard: df_addGeneName.at[wildcard.sample, 'bedtoolsPath'],
+        geneBed = lambda wildcard: df_addGeneName.at[wildcard.sample, 'geneBed'],
+        mappingBam = lambda wildcard: df_minimapMappingPolished.at[wildcard.sample, 'mappingBam'],
+    threads:2
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+python ./snuupy/snuupy.py addGeneName -i {params.mappingBam} --bed {params.geneBed} --out-pickle {params.addGNPickle} --out-bam {params.addGNBam} --bedtools {params.bedtoolsPath}
+touch {output.addGeneNameFinished}
+        """
+
+# parameter's dataframe of getSpliceInfo: 
+# |      | splicingInfo     | bedtoolsPath                                        | geneAnnoRepreBed                                                                                              |
+# |:-----|:-----------------|:----------------------------------------------------|:--------------------------------------------------------------------------------------------------------------|
+# | test | splicingInfo.tsv | /public/home/liuzj/softwares/anaconda3/bin/bedtools | /public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/araport11.representative.gene_model.bed |
+rule getSpliceInfo:
+    input:
+        minimapMappingPolishedFinished = resultDir + 'step11_minimapMappingPolished/' + '{sample}.finished',
+        addGeneNameFinished = resultDir + 'step12_addGeneName/' + '{sample}.finished',
+    output:
+        getSpliceInfoFinished = resultDir + 'step13_getSpliceInfo/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        splicingInfo = lambda wildcard: df_getSpliceInfo.at[wildcard.sample, 'splicingInfo'],
+        bedtoolsPath = lambda wildcard: df_getSpliceInfo.at[wildcard.sample, 'bedtoolsPath'],
+        geneAnnoRepreBed = lambda wildcard: df_getSpliceInfo.at[wildcard.sample, 'geneAnnoRepreBed'],
+        mappingBam = lambda wildcard: df_minimapMappingPolished.at[wildcard.sample, 'mappingBam'],
+        addGNPickle = lambda wildcard: df_addGeneName.at[wildcard.sample, 'addGNPickle'],
+    threads:2
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+python ./snuupy/snuupy.py getSpliceInfo --ratio -i {params.mappingBam} -b {params.geneAnnoRepreBed} -o {params.splicingInfo} -g {params.addGNPickle} --bedtools {params.bedtoolsPath}
+touch {output.getSpliceInfoFinished}
+        """
+
+# parameter's dataframe of addPolyATag: 
+# |      | addGNPABam     | polyACallerWorkDir   | nanoporeWorkspace                                                  | nanoporeSeqSummary                                                              | geneAnnoBed                                                                    | minimap2Path                                        | genomeFa                                                                        | rawNanoporeFa                                                        |
+# |:-----|:---------------|:---------------------|:-------------------------------------------------------------------|:--------------------------------------------------------------------------------|:-------------------------------------------------------------------------------|:----------------------------------------------------|:--------------------------------------------------------------------------------|:---------------------------------------------------------------------|
+# | test | addGNPABam.bam | polyACallerWorkDir/  | /public/home/liuzj/publicPipeline/snuupy/example/00_data/workspace | /public/home/liuzj/publicPipeline/snuupy/example/00_data/nanoporeSeqSummary.txt | /public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/gene.bed | /public/home/liuzj/softwares/anaconda3/bin/minimap2 | /public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa | /public/home/liuzj/publicPipeline/snuupy/example/00_data/nanopore.fa |
+rule addPolyATag:
+    input:
+        barcodeAssignmentFinished = resultDir + 'step9_barcodeAssignment/' + '{sample}.finished',
+        addGeneNameFinished = resultDir + 'step12_addGeneName/' + '{sample}.finished',
+    output:
+        addPolyATagFinished = resultDir + 'step14_addPolyATag/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        addGNPABam = lambda wildcard: df_addPolyATag.at[wildcard.sample, 'addGNPABam'],
+        polyACallerWorkDir = lambda wildcard: df_addPolyATag.at[wildcard.sample, 'polyACallerWorkDir'],
+        nanoporeWorkspace = lambda wildcard: df_addPolyATag.at[wildcard.sample, 'nanoporeWorkspace'],
+        nanoporeSeqSummary = lambda wildcard: df_addPolyATag.at[wildcard.sample, 'nanoporeSeqSummary'],
+        geneAnnoBed = lambda wildcard: df_addPolyATag.at[wildcard.sample, 'geneAnnoBed'],
+        minimap2Path = lambda wildcard: df_addPolyATag.at[wildcard.sample, 'minimap2Path'],
+        genomeFa = lambda wildcard: df_addPolyATag.at[wildcard.sample, 'genomeFa'],
+        rawNanoporeFa = lambda wildcard: df_addPolyATag.at[wildcard.sample, 'rawNanoporeFa'],
+        nanoporeAssigned = lambda wildcard: df_barcodeAssignment.at[wildcard.sample, 'nanoporeAssigned'],
+        addGNBam = lambda wildcard: df_addGeneName.at[wildcard.sample, 'addGNBam'],
+    threads:48
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+python ./snuupy/snuupy.py addPolyATag --in-fasta {params.rawNanoporeFa} --genome {params.genomeFa} -t {threads} --in-f5-workspace {params.nanoporeWorkspace} --in-f5-summary {params.nanoporeSeqSummary} --bed {params.geneAnnoBed} --tempDir {params.polyACallerWorkDir} --feather {params.nanoporeAssigned} --in-bam {params.addGNBam} --out-bam {params.addGNPABam} --minimap {params.minimap2Path}
+touch {output.addPolyATagFinished}
+        """
+
+# parameter's dataframe of polyAClusterDetected: 
+# |      | polyAClusterDir   | polyAClusterResult                      | geneAnnoBed                                                                    | genomeFa                                                                        |
+# |:-----|:------------------|:----------------------------------------|:-------------------------------------------------------------------------------|:--------------------------------------------------------------------------------|
+# | test | polyACluster/     | polyACluster/polya_cluster.filtered.bed | /public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/gene.bed | /public/home/liuzj/publicPipeline/snuupy/example/00_data/ref/annoFile/genome.fa |
+rule polyAClusterDetected:
+    input:
+        addPolyATagFinished = resultDir + 'step14_addPolyATag/' + '{sample}.finished',
+    output:
+        polyAClusterDetectedFinished = resultDir + 'step15_polyAClusterDetected/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        polyAClusterDir = lambda wildcard: df_polyAClusterDetected.at[wildcard.sample, 'polyAClusterDir'],
+        geneAnnoBed = lambda wildcard: df_polyAClusterDetected.at[wildcard.sample, 'geneAnnoBed'],
+        genomeFa = lambda wildcard: df_polyAClusterDetected.at[wildcard.sample, 'genomeFa'],
+        addGNPABam = lambda wildcard: df_addPolyATag.at[wildcard.sample, 'addGNPABam'],
+    threads:48
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+python ./snuupy/snuupy.py polyAClusterDetected --infile {params.addGNPABam} --gene-bed {params.geneAnnoBed} --out-dir {params.polyAClusterDir} -t {threads} --fasta {params.genomeFa} --bed12
+touch {output.polyAClusterDetectedFinished}
+        """
+
+# parameter's dataframe of generateMtx: 
+# |      | h5muPath    | usedIntron                                                     |
+# |:-----|:------------|:---------------------------------------------------------------|
+# | test | result.h5mu | /data/Zhaijx/liuzj/data/Araport11/select_intron_by_Cyto.id.txt |
+rule generateMtx:
+    input:
+        getSpliceInfoFinished = resultDir + 'step13_getSpliceInfo/' + '{sample}.finished',
+        addPolyATagFinished = resultDir + 'step14_addPolyATag/' + '{sample}.finished',
+        polyAClusterDetectedFinished = resultDir + 'step15_polyAClusterDetected/' + '{sample}.finished',
+        runCellRangerFinished = resultDir + 'step1_runCellRanger/' + '{sample}.finished',
+    output:
+        generateMtxFinished = resultDir + 'step16_generateMtx/' + '{sample}.finished',
+    params:
+        gpu = 0,
+        h5muPath = lambda wildcard: df_generateMtx.at[wildcard.sample, 'h5muPath'],
+        usedIntron = lambda wildcard: df_generateMtx.at[wildcard.sample, 'usedIntron'],
+        splicingInfo = lambda wildcard: df_getSpliceInfo.at[wildcard.sample, 'splicingInfo'],
+        addGNPABam = lambda wildcard: df_addPolyATag.at[wildcard.sample, 'addGNPABam'],
+        polyAClusterResult = lambda wildcard: df_polyAClusterDetected.at[wildcard.sample, 'polyAClusterResult'],
+        illuminaMtx = lambda wildcard: df_runCellRanger.at[wildcard.sample, 'illuminaMtx'],
+    threads:2
+    priority:0
+    shell:
+        """
+cd {pipelineDir}
+if [ {params.usedIntron} = False ]
+then 
+    python ./snuupy/snuupy.py generateMtx --not-FullLength -i {params.splicingInfo} --in-illumina {params.illuminaMtx} --apa-pac {params.polyAClusterResult} --apa-bam {params.addGNPABam} --ir --out-h5mu {params.h5muPath}
+else
+    python ./snuupy/snuupy.py generateMtx --not-FullLength-i {params.splicingInfo} --in-illumina {params.illuminaMtx} --apa-pac {params.polyAClusterResult} --apa-bam {params.addGNPABam} --ir --ir-list {params.usedIntron} --out-h5mu {params.h5muPath}
+fi
+touch {output.generateMtxFinished}
         """
 
 
