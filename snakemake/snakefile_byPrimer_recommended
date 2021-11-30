@@ -595,7 +595,7 @@ if [ {params.usedIntron} = False ]
 then 
     python ./snuupy/snuupy.py generateMtx --not-FullLength -i {params.splicingInfo} --in-illumina {params.illuminaMtx} --apa-pac {params.polyAClusterResult} --apa-bam {params.addGNPABam} --ir --out-h5mu {params.h5muPath}
 else
-    python ./snuupy/snuupy.py generateMtx --not-FullLength-i {params.splicingInfo} --in-illumina {params.illuminaMtx} --apa-pac {params.polyAClusterResult} --apa-bam {params.addGNPABam} --ir --ir-list {params.usedIntron} --out-h5mu {params.h5muPath}
+    python ./snuupy/snuupy.py generateMtx --not-FullLength -i {params.splicingInfo} --in-illumina {params.illuminaMtx} --apa-pac {params.polyAClusterResult} --apa-bam {params.addGNPABam} --ir --ir-list {params.usedIntron} --out-h5mu {params.h5muPath}
 fi
 touch {output.generateMtxFinished}
         """

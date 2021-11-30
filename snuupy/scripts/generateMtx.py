@@ -99,6 +99,9 @@ def generateMtx(
     """
     generate expression mtx (format h5mu)
     """
+    if intronList == 'False':  # compatible with click
+        intronList = False
+
     if not h5muPath:
         h5muPath = illuminaMtxDirPath.rstrip("/") + ".h5mu"
         logger.warning(f"argument `illuminaMtxDirPath` is deprecated, output file will be redirected to `{h5muPath}`")
@@ -132,7 +135,7 @@ def generateMtx(
 
         if intronList:
             useIntron = pd.read_table(intronList)
-            useIntron["geneId"] = useIntron["intron_id"].str.split(".").str[0]
+            useIntron["geneId"] = useIntron["intron_id"].str.split("\|").str[-1].str.split('_intron').str[0]
             useIntron["intronId"] = (
                 useIntron["intron_id"].str.split("intron").str[-1].astype(int) - 1
             )

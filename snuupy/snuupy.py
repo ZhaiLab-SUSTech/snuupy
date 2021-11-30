@@ -525,7 +525,8 @@ def _polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads, is_b
 @click.option(
     "--ir-list",
     "intronList",
-    default=False,
+    default=False, 
+    type=str,
     help="only use those intron to calculate splicing matrix; if not provided, all intron will be used",
 )
 @click.option(
