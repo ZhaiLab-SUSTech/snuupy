@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 import pysam
 from loguru import logger
-from .tools import bedtoolsGetIntersect
+from tempfile import NamedTemporaryFile
+from .tools import bedtoolsGetIntersect, generateGeneBed
 
 
 def addGeneTag(readWithGeneInformation, inBamPath, outBamPath, geneIdTag):
@@ -63,8 +64,11 @@ USECOLS = [
 ]
 
 
-def addGeneName(inBamPath, bedAnno, outfile, bedtoolsPath, outBamPath, geneIdTag):
+def addGeneName(inBamPath, bedAnno, outfile, bedtoolsPath, outBamPath, geneIdTag, include_intron=True):
     logger.info("Start get intersect between bam and bed12")
+    if include_intron:
+        path_tempBedGene = NamedTemporaryFile("w", suffix=".bed")
+        bedAnno = generateGeneBed(bedAnno, path_tempBedGene.name)
     intersectBuff = bedtoolsGetIntersect(inBamPath, bedAnno, bedtoolsPath)
 
     logger.info("Start read intersect result")

@@ -125,7 +125,7 @@ def generateMtx(
     readIrInfo.set_index("Name", inplace=True)
     expressionGeneInfo = readIrInfo["geneId"].copy()
     if "ir" in mode:
-
+        readIrInfo["ExonOverlapInfo"] = readIrInfo["ExonOverlapInfo"].fillna('') # some reads only mapped to intron, but not exon
         readIrInfo["exonOverlapCounts"] = (
             readIrInfo["ExonOverlapInfo"].str.split(",").map(lambda x: len(x))
         )

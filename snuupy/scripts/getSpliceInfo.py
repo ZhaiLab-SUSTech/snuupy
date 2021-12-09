@@ -3,14 +3,109 @@ import numpy as np
 import sh
 from concurrent.futures import ProcessPoolExecutor as multiP
 from loguru import logger
-from .tools import Jinterval as jI
-from .tools import bedtoolsGetIntersect
 from io import StringIO
 import pyranges as pr
 from tempfile import NamedTemporaryFile
 import click
 import pickle
+import portion as P
+from collections import defaultdict
+from tqdm import tqdm
 
+
+NAMES = [
+    "Chromosome",
+    "Start",
+    "End",
+    "Name",
+    "Score",
+    "Strand",
+    "ThickStart",
+    "ThickEnd",
+    "ItemRGB",
+    "BlockCount",
+    "BlockSizes",
+    "BlockStarts",
+    "geneChromosome",
+    "geneStart",
+    "geneEnd",
+    "geneName",
+    "geneScore",
+    "geneStrand",
+    "geneThickStart",
+    "geneThickEnd",
+    "geneItemRGB",
+    "geneBlockCount",
+    "geneBlockSizes",
+    "geneBlockStarts",
+    "cov",
+]
+USECOLS = [
+    "Chromosome",
+    "Start",
+    "End",
+    "Name",
+    "Strand",
+    "BlockSizes",
+    "BlockStarts",
+    "geneStart",
+    "geneEnd",
+    "geneName",
+    "geneBlockCount",
+    "geneBlockSizes",
+    "geneBlockStarts",
+    "cov",
+]
+
+
+def bedtoolsGetIntersect(inBam, bedAnno, bedtoolsPath, bed12=True):
+    intersectBuff = StringIO()
+    if bed12:
+        sh.Command(bedtoolsPath).intersect(
+            "-abam",
+            inBam,
+            "-b",
+            bedAnno,
+            "-wo",
+            "-s",
+            "-split",
+            "-bed",
+            _out=intersectBuff,
+        )
+        intersectBuff.seek(0)
+        bedFile = pd.read_table(
+            intersectBuff, header=None, names=NAMES, usecols=USECOLS
+        )
+        bedFile["BlockStarts"] = (
+            bedFile["BlockStarts"]
+            .astype(str)
+            .map(lambda x: np.fromstring(x, sep=",", dtype=int))
+        )
+        bedFile["BlockSizes"] = (
+            bedFile["BlockSizes"]
+            .astype(str)
+            .map(lambda x: np.fromstring(x, sep=",", dtype=int))
+        )
+        bedFile["geneBlockSizes"] = (
+            bedFile["geneBlockSizes"]
+            .astype(str)
+            .map(lambda x: np.fromstring(x, sep=",", dtype=int))
+        )
+        bedFile["geneBlockStarts"] = (
+            bedFile["geneBlockStarts"]
+            .astype(str)
+            .map(lambda x: np.fromstring(x, sep=",", dtype=int))
+        )
+    else:
+        sh.Command(bedtoolsPath).intersect(
+            "-abam", inBam, "-b", bedAnno, "-wo", "-s", "-bed", "-split", _out=intersectBuff
+        )
+        intersectBuff.seek(0)
+        bedFile = pd.read_table(intersectBuff, header=None)
+        bedFile = bedFile[[3, 13, 14, 15, 18]].rename(
+            columns={3: "Name", 13: "geneStart", 14: "geneEnd", 15: "geneName", 18: "cov"}
+        )
+    return bedFile
 
 def getLongestIsoform(path_bed, path_tempBed):
     df_bed = pr.read_bed(path_bed, as_df=True)
@@ -24,260 +119,275 @@ def getLongestIsoform(path_bed, path_tempBed):
         .sort_values(["Chromosome", "Start"])
         .drop(columns=["IsoformLength", "Gene"])
     )
-    df_bed.to_csv(path_tempBed, sep='\t', header=None, index=None)
+    df_bed.to_csv(path_tempBed, sep="\t", header=None, index=None)
+    return path_tempBed
+
+def generateGeneBed(path_bed, path_tempBed):
+    df_bed = pr.read_bed(path_bed, as_df=True)
+    df_bed = df_bed.pipe(
+        lambda df: df.assign(
+            ItemRGB=0.0,
+            BlockCount=1,
+            BlockSizes=(df["End"] - df["Start"]).astype(str) + ",",
+            BlockStarts="0,",
+        )
+    )
+    df_bed.to_csv(path_tempBed, sep="\t", header=None, index=None)
+    return path_tempBed
+
+def _getIntrons(line, bed12):
+    if int(line.BlockCount) <= 1:
+        return None
+
+    ls_tuple = []
+    for start, length in zip(
+        line.BlockStarts.split(",")[:-1], line.BlockSizes.split(",")[:-1]
+    ):
+        start = int(start)
+        length = int(length)
+        ls_tuple.append(P.closedopen(start, start + length))
+    iv_exon = P.Interval(*ls_tuple)
+    iv_gene = P.closedopen(0, int(line.End) - int(line.Start))
+    iv_intron = iv_gene - iv_exon
+    ls_intron = list(iv_intron)
+    if not bed12:
+        if line.Strand == "-":
+            ls_intron = ls_intron[::-1]
+
+        ls_intronFeature = []
+        for intronNum, iv_singleIntron in zip(range(1, 1 + len(ls_intron)), ls_intron):
+            ls_intronFeature.append(
+                [
+                    f"{line.Name}_intron{intronNum}",
+                    line.Chromosome,
+                    line.Start + iv_singleIntron.lower,
+                    line.Start + iv_singleIntron.upper,
+                    line.Strand,
+                ]
+            )
+        return ls_intronFeature
+    else:
+        Start = line.Start + ls_intron[0].lower
+        BlockStarts = (
+            ",".join([str(x.lower - ls_intron[0].lower) for x in ls_intron]) + ","
+        )
+        BlockSizes = ",".join([str(x.upper - x.lower) for x in ls_intron]) + ","
+        BlockCount = len(ls_intron)
+        End = line.Start + ls_intron[-1].upper
+        sr_intron = pd.Series(
+            dict(
+                Chromosome=line.Chromosome,
+                Start=Start,
+                End=End,
+                Name=line.Name,
+                Score=line.Score,
+                Strand=line.Strand,
+                ThickStart=Start,
+                ThickEnd=End,
+                ItemRGB=line.ItemRGB,
+                BlockCounts=BlockCount,
+                BlockSizes=BlockSizes,
+                BlockStarts=BlockStarts,
+            )
+        )
+        return sr_intron
+
+
+def generateIntrons(path_bed, path_tempBed, bed12=True) -> pd.DataFrame:
+    df_bed = pr.read_bed(path_bed, as_df=True)
+    ls_introns = [
+        _getIntrons(x, bed12)
+        for x in tqdm(
+            df_bed.query("BlockCount > 1").itertuples(),
+            total=len(df_bed.query("BlockCount > 1")),
+        )
+    ]
+    if not bed12:
+        df_introns = pd.DataFrame(
+            [y for x in ls_introns for y in x],
+            columns=["Name", "Chromosome", "Start", "End", "Strand"],
+        ).assign(Score = 0)
+    
+        df_introns = df_introns[['Chromosome', 'Start', 'End', 'Name', 'Score', 'Strand']]
+        df_introns["Chromosome"] = df_introns["Chromosome"].astype(str)
+        df_introns = df_introns.sort_values(["Chromosome", "Start"])
+    else:
+        df_introns = pd.DataFrame(
+            ls_introns,
+        )
+        df_introns["Chromosome"] = df_introns["Chromosome"].astype(str)
+        df_introns = df_introns.sort_values(["Chromosome", "Start"])
+    df_introns.to_csv(path_tempBed, sep="\t", header=None, index=None)
     return path_tempBed
 
 
-def getGeneExon(line):
-    geneBlockStarts = line.geneBlockStarts
-    geneBlockSizes = line.geneBlockSizes
-    if line.Strand == "+":
-        geneBlockStarts = geneBlockStarts + line.geneStart
+def _getExons(line):
+    ls_tuple = []
+    for start, length in zip(
+        line.BlockStarts.split(",")[:-1], line.BlockSizes.split(",")[:-1]
+    ):
+        start = int(start)
+        length = int(length)
+        ls_tuple.append(P.closedopen(start, start + length))
+    iv_exon = P.Interval(*ls_tuple)
+    ls_exon = list(iv_exon)
+    if line.Strand == "-":
+        ls_exon = ls_exon[::-1]
 
-    #        geneBlockSizes = geneBlockSizes
-    else:
-        geneBlockStarts = geneBlockStarts[::-1] + line.geneStart
-        geneBlockSizes = geneBlockSizes[::-1]
-    for singleBlockStart, singleBlockSize in zip(geneBlockStarts, geneBlockSizes):
-        yield jI(singleBlockStart, singleBlockStart + singleBlockSize, 0)
-
-
-def getReadBlock(line):
-    readBlockStarts = line.BlockStarts
-    readBlockSizes = line.BlockSizes
-    if line.Strand == "+":
-        readBlockStarts = readBlockStarts + line.Start
-
-    #         readBlockSizes = readBlockSizes
-    else:
-        readBlockStarts = readBlockStarts[::-1] + line.Start
-        readBlockSizes = readBlockSizes[::-1]
-    for singleBlockStart, singleBlockSize in zip(readBlockStarts, readBlockSizes):
-        yield jI(singleBlockStart, singleBlockStart + singleBlockSize)
-
-
-def getGeneIntron(strand):
-    forwordExon = False
-    backwordExon = False
-    intron = jI(0, 0)
-    while True:
-        backwordExon = forwordExon
-        forwordExon = yield intron
-        if backwordExon:
-            if strand == "+":
-                forwordExonLower = forwordExon.lower
-                backwordExonUpper = backwordExon.upper
-                intron = jI(backwordExonUpper, forwordExonLower)
-            elif strand == "-":
-                forwordExonUpper = forwordExon.upper
-                backwordExonLower = backwordExon.lower
-                intron = jI(forwordExonUpper, backwordExonLower)
-            else:
-                raise ValueError("strand info error")
+    ls_exonFeature = []
+    for exonNum, iv_singleExon in zip(range(1, 1 + len(ls_exon)), ls_exon):
+        ls_exonFeature.append(
+            [
+                f"{line.Name}_exon{exonNum}",
+                line.Chromosome,
+                line.Start + iv_singleExon.lower,
+                line.Start + iv_singleExon.upper,
+                line.Strand,
+            ]
+        )
+    return ls_exonFeature
 
 
-def getOverlapIntronAndExon(line, needOverlap):
-    strand = line.Strand
-    exonGenerator = getGeneExon(line)
-    blockGenerator = getReadBlock(line)
-    overlapExons = []
-    overlapIntrons = []
-    if needOverlap:
-        overlapIntronsInfo = {}
-
-    currentBlock = next(blockGenerator)
-    currentExon = next(exonGenerator)
-    exonNum = 0
-
-    intronGenerator = getGeneIntron(strand)
-    next(intronGenerator)
-    currentIntron = intronGenerator.send(currentExon)
-
-    while True:
-        if currentExon & currentBlock:
-            overlapExons.append(str(exonNum))
-            if (needOverlap) & (exonNum >= 1):
-                overlapIntronsInfo[str(exonNum - 1)] = str(
-                    currentIntron.getOverlapRatio(currentBlock)
-                )
-        if currentIntron & currentBlock:
-            overlapIntrons.append(str(exonNum - 1))
-            if needOverlap:
-                overlapIntronsInfo[str(exonNum - 1)] = str(
-                    currentIntron.getOverlapRatio(currentBlock)
-                )
-
-        try:
-            if strand == "+":
-                if currentExon.lower >= currentBlock.upper:
-                    currentBlock = next(blockGenerator)
-                else:
-                    currentExon = next(exonGenerator)
-                    currentIntron = intronGenerator.send(currentExon)
-                    exonNum += 1
-            elif strand == "-":
-                if currentExon.upper > currentBlock.lower:
-                    currentExon = next(exonGenerator)
-                    currentIntron = intronGenerator.send(currentExon)
-                    exonNum += 1
-                else:
-                    currentBlock = next(blockGenerator)
-        except StopIteration:
-            if needOverlap:
-                if not overlapIntronsInfo:
-                    overlapIntronsInfo = ""
-                else:
-                    overlapIrIntronsInfo = {
-                        x: y for x, y in overlapIntronsInfo.items() if float(y) != 0
-                    }
-                    overlapIntronsInfo = {
-                        x: y for x, y in overlapIntronsInfo.items() if x in overlapExons
-                    }
-                    overlapIntronsInfo.update(overlapIrIntronsInfo)
-                    overlapIntronsInfo = [
-                        f"{x}:{y}" for x, y in overlapIntronsInfo.items()
-                    ]
-            break
-    if needOverlap:
-        return overlapExons, overlapIntrons, overlapIntronsInfo
-    else:
-        return overlapExons, overlapIntrons
-
-
-def filterResultsBasedOnGeneName(INTRON_INFO, GENE_NAME_INFO, OUT_PATH):
-    with open(GENE_NAME_INFO, "rb") as fh:
-        geneNameInfo = pickle.load(fh)
-    intronInfo = pd.read_table(INTRON_INFO)
-    intronInfo["geneIdNonTrans"] = intronInfo["GeneId"].str.split("\|").str[-1]
-    intronInfo["baselineGeneId"] = intronInfo["Name"].map(
-        lambda x: geneNameInfo.get(x, {"gene_id": 0})["gene_id"]
-    )
-    intronInfo.query("geneIdNonTrans == baselineGeneId", inplace=True)
-    intronInfo.drop(["baselineGeneId", "GeneId"], axis=1, inplace=True)
-    intronInfo.rename({"geneIdNonTrans": "geneId"}, axis=1, inplace=True)
-    intronInfo.to_csv(OUT_PATH, sep="\t", index=False)
+def generateExons(path_bed, path_tempBed) -> pd.DataFrame:
+    df_bed = pr.read_bed(path_bed, as_df=True)
+    ls_exons = [
+        _getExons(x)
+        for x in tqdm(
+            df_bed.itertuples(),
+            total=len(df_bed),
+        )
+    ]
+    df_exons = pd.DataFrame(
+        [y for x in ls_exons for y in x],
+        columns=["Name", "Chromosome", "Start", "End", "Strand"],
+    ).assign(Score = 0)
+    
+    df_exons = df_exons[['Chromosome', 'Start', 'End', 'Name', 'Score', 'Strand']]
+    
+    df_exons['Chromosome'] = df_exons['Chromosome'].astype(str)
+    df_exons = df_exons.sort_values(['Chromosome', 'Start'])
+    df_exons.to_csv(path_tempBed, sep="\t", header=None, index=None)
+    return path_tempBed 
 
 
 def getSpliceInfo(
-    INBAM_PATH, BED_REPRE_ANNO, GENE_NAME_INFO, OUT_PATH, NEED_RATIO, bedtoolsPath
+    INBAM_PATH, BED_REPRE_ANNO, GENE_NAME_INFO, OUT_PATH, NEED_RATIO, bedtoolsPath, intronCutoff=0.1, INCLUDE_INTRON=True
 ):
+    if GENE_NAME_INFO:
+        logger.warning(f"parameter GENE_NAME_INFO is deprecated")
+    if NEED_RATIO:
+        logger.warning(f"parameter NEED_RATIO is deprecated")
+
     path_tempBed = NamedTemporaryFile("w", suffix=".bed")
     BED_REPRE_ANNO = getLongestIsoform(BED_REPRE_ANNO, path_tempBed.name)
+    df_bed = pr.read_bed(BED_REPRE_ANNO, True).set_index('Name')
+    dt_geneExonCounts = df_bed['BlockCount'].to_dict()
+    dt_geneStrand = df_bed['Strand'].to_dict()
 
-    intersectResults = bedtoolsGetIntersect(INBAM_PATH, BED_REPRE_ANNO, bedtoolsPath)
-
-    NAMES = [
-        "Chromosome",
-        "Start",
-        "End",
-        "Name",
-        "Score",
-        "Strand",
-        "ThickStart",
-        "ThickEnd",
-        "ItemRGB",
-        "BlockCount",
-        "BlockSizes",
-        "BlockStarts",
-        "geneChromosome",
-        "geneStart",
-        "geneEnd",
-        "geneName",
-        "geneScore",
-        "geneStrand",
-        "geneThickStart",
-        "geneThickEnd",
-        "geneItemRGB",
-        "geneBlockCount",
-        "geneBlockSizes",
-        "geneBlockStarts",
-        "cov",
-    ]
-    USECOLS = [
-        "Chromosome",
-        "Start",
-        "End",
-        "Name",
-        "Strand",
-        "BlockSizes",
-        "BlockStarts",
-        "geneStart",
-        "geneEnd",
-        "geneName",
-        "geneBlockCount",
-        "geneBlockSizes",
-        "geneBlockStarts",
-    ]
-    logger.info("read bedtools result")
-    bedFile = pd.read_table(intersectResults, header=None, names=NAMES, usecols=USECOLS)
-    logger.info("read bedtools result over; start transform format")
-    bedFile["BlockStarts"] = (
-        bedFile["BlockStarts"]
-        .astype(str)
-        .map(lambda x: np.fromstring(x, sep=",", dtype=int))
-    )
-    bedFile["BlockSizes"] = (
-        bedFile["BlockSizes"]
-        .astype(str)
-        .map(lambda x: np.fromstring(x, sep=",", dtype=int))
-    )
-    bedFile["geneBlockSizes"] = (
-        bedFile["geneBlockSizes"]
-        .astype(str)
-        .map(lambda x: np.fromstring(x, sep=",", dtype=int))
-    )
-    bedFile["geneBlockStarts"] = (
-        bedFile["geneBlockStarts"]
-        .astype(str)
-        .map(lambda x: np.fromstring(x, sep=",", dtype=int))
-    )
-    fh = StringIO()
-    if NEED_RATIO:
-        header = f"Name\tGeneId\tStrand\tGeneExonCounts\tExonOverlapInfo\tIntronOverlapInfo\tintronOverlapRatioInfo\n"
-        fh.write(header)
-        i = 0
-
-        for line in bedFile.itertuples():
-            if i % 100000 == 0:
-                logger.info(f"{i} lines were processed, waiting")
-            i += 1
-
-            (
-                lineExonInfo,
-                lineIntronInfo,
-                lineIntronOverlapInfo,
-            ) = getOverlapIntronAndExon(line, NEED_RATIO)
-            lineExonInfo = ",".join(lineExonInfo)
-            lineIntronInfo = ",".join(lineIntronInfo)
-            lineIntronOverlapInfo = ",".join(lineIntronOverlapInfo)
-            lineStrand = line.Strand
-            lineName = line.Name
-            lineGene = line.geneName
-            lineGeneExonCounts = line.geneBlockCount
-            lineContent = f"{lineName}\t{lineGene}\t{lineStrand}\t{lineGeneExonCounts}\t{lineExonInfo}\t{lineIntronInfo}\t{lineIntronOverlapInfo}\n"
-            fh.write(lineContent)
-
+    if INCLUDE_INTRON:
+        path_tempBedGene = NamedTemporaryFile("w", suffix=".bed")
+        BED_GENE = generateGeneBed(BED_REPRE_ANNO, path_tempBedGene.name)
     else:
-        header = f"Name\tGeneId\tStrand\tGeneExonCounts\tExonOverlapInfo\tIntronOverlapInfo\n"
-        fh.write(header)
-        i = 0
+        BED_GENE = BED_REPRE_ANNO
 
-        for line in bedFile.itertuples():
-            if i % 100000 == 0:
-                logger.info(f"{i} lines were processed, waiting")
-            i += 1
+    df_geneIntersect = bedtoolsGetIntersect(INBAM_PATH, BED_GENE, bedtoolsPath)
 
-            lineExonInfo, lineIntronInfo = getOverlapIntronAndExon(line, NEED_RATIO)
-            lineExonInfo = ",".join(lineExonInfo)
-            lineIntronInfo = ",".join(lineIntronInfo)
-            lineStrand = line.Strand
-            lineName = line.Name
-            lineGene = line.geneName
-            lineGeneExonCounts = line.geneBlockCount
-            lineContent = f"{lineName}\t{lineGene}\t{lineStrand}\t{lineGeneExonCounts}\t{lineExonInfo}\t{lineIntronInfo}\n"
-            fh.write(lineContent)
-    logger.info(f"{i} lines were processed, waiting")
+    dt_barcodeWithGene = (
+        df_geneIntersect.sort_values(["Name", "cov"], ascending=False)
+        .drop_duplicates(["Name"])
+        .set_index("Name")["geneName"]
+        .to_dict()
+    )
 
-    fh.seek(0)
-    filterResultsBasedOnGeneName(fh, GENE_NAME_INFO, OUT_PATH)
-    path_tempBed.close()
+    path_tempBedExon = NamedTemporaryFile("w", suffix=".bed")
+    BED_EXON = generateExons(BED_REPRE_ANNO, path_tempBedExon.name)
+    df_exonIntersect = bedtoolsGetIntersect(INBAM_PATH, BED_EXON, bedtoolsPath, bed12=False)
+
+    df_exonIntersect = df_exonIntersect.assign(
+        trueName=lambda df: df["Name"].map(dt_barcodeWithGene),
+        exonName=lambda df: df["geneName"],
+    ).assign(geneName=lambda df: df['geneName'].str.split('_exon').str[0])
+
+    df_exonIntersect = df_exonIntersect.query("geneName == trueName")
+    df_exonIntersect = df_exonIntersect.assign(exonNum = lambda df:df['exonName'].str.split('_exon').str[-1].astype(int))
+    df_exonCov = df_exonIntersect.groupby('Name')['exonNum'].agg(['min', 'max'])
+    dt_exonCov = df_exonCov.to_dict('index')
+
+    path_tempBedIntron = NamedTemporaryFile("w", suffix=".bed")
+    BED_INTRON = generateIntrons(BED_REPRE_ANNO, path_tempBedIntron.name, bed12=False)
+    df_intronIntersect = bedtoolsGetIntersect(INBAM_PATH, BED_INTRON, bedtoolsPath, bed12=False)
+
+    df_intronIntersect = df_intronIntersect.assign(
+        trueName=lambda df: df["Name"].map(dt_barcodeWithGene),
+        intronName=lambda df: df["geneName"],
+    ).assign(geneName=lambda df: df['geneName'].str.split('_intron').str[0])
+
+    df_intronIntersect = df_intronIntersect.query("geneName == trueName")
+    df_intronIntersect = df_intronIntersect.assign(
+        intronNum=lambda df: df["intronName"].str.split("_intron").str[-1].astype(int),
+        intronRatio = lambda df:df.eval("cov / (geneEnd - geneStart)")
+    )
+
+    dt_intronCovInf = defaultdict(lambda :{})
+    for line in tqdm(df_intronIntersect.itertuples(), total = len(df_intronIntersect)):
+        dt_UmiIntron = dt_intronCovInf[line.Name]
+        dt_UmiIntron[line.intronNum] = line.intronRatio
+    dt_intronCovInf = dict(dt_intronCovInf)
+
+    ls_results = []
+    intronCutoff = 0.1
+    for umi, gene in tqdm(dt_barcodeWithGene.items()):
+        exonCounts = dt_geneExonCounts[gene]
+        strand = dt_geneStrand[gene]
+        # record exon info
+        if umi in dt_exonCov:
+            exonOverlap = dt_exonCov[umi]
+            exonMin = exonOverlap["min"] - 1  # 1-base to 0-base
+            exonMax = exonOverlap["max"]
+            exonOverlapInfo = ",".join([str(x) for x in range(exonMin, exonMax)])
+        else:
+            exonOverlapInfo = ""
+
+        # record intron info
+        if umi in dt_intronCovInf:
+            dt_intronOverlapRatioInfo = {x - 1:y for x,y in dt_intronCovInf[umi].items()} # 1-base to 0-base
+        else:
+            dt_intronOverlapRatioInfo = {}
+        if exonOverlapInfo:
+            intronMin = exonMin
+            intronMax = exonMax - 1
+            _dt = {x: 0.0 for x in range(intronMin, intronMax)}
+            _dt.update(dt_intronOverlapRatioInfo)
+            dt_intronOverlapRatioInfo = _dt
+        intronOverlapRatio = ",".join(
+            [f"{x}:{y}" for x, y in dt_intronOverlapRatioInfo.items()]
+        )
+        intronRetained = ",".join(
+            [str(x) for x, y in dt_intronOverlapRatioInfo.items() if y > intronCutoff]
+        )
+    #     sr_result = pd.Series(
+    #         dict(
+    #             Name=umi,
+    #             Strand=strand,
+    #             GeneExonCounts=exonCounts,
+    #             ExonOverlapInfo=exonOverlapInfo,
+    #             IntronOverlapInfo=intronRetained,
+    #             intronOverlapRatioInfo=intronOverlapRatio,
+    #             geneId=gene.split("|")[-1],
+    #         )
+    #     ) # too slow
+        ls_results.append([umi, strand, exonCounts, exonOverlapInfo, intronRetained, intronOverlapRatio, gene.split("|")[-1]])
+
+    df_results = pd.DataFrame(
+        ls_results,
+        columns=[
+            "Name",
+            "Strand",
+            "GeneExonCounts",
+            "ExonOverlapInfo",
+            "IntronOverlapInfo",
+            "intronOverlapRatioInfo",
+            "geneId",
+        ],
+    ).sort_values(['geneId', 'Name'])
+    df_results.to_csv(OUT_PATH, sep="\t", index=False)

@@ -17,7 +17,8 @@ import pickle
 import lmdb
 import anndata
 from more_itertools import chunked
-
+from tqdm import tqdm
+import pyranges as pr
 
 def getBlock(read, intron):
     """
@@ -773,3 +774,116 @@ def readDeserialization(dt_header, ls_read):
     if return_single:
         ls_read = ls_read[0]
     return ls_read
+
+def getLongestIsoform(path_bed, path_tempBed):
+    df_bed = pr.read_bed(path_bed, as_df=True)
+    df_bed["IsoformLength"] = df_bed["BlockSizes"].map(
+        lambda z: sum([int(x) for x in z.split(",")[:-1]])
+    ) - df_bed.eval("`ThickStart` - Start + End - `ThickEnd`")
+    df_bed["Gene"] = df_bed["Name"].str.split("\|").str[-1]
+    df_bed = (
+        df_bed.sort_values("IsoformLength", ascending=False)
+        .drop_duplicates("Gene")
+        .sort_values(["Chromosome", "Start"])
+        .drop(columns=["IsoformLength", "Gene"])
+    )
+    df_bed.to_csv(path_tempBed, sep="\t", header=None, index=None)
+    return path_tempBed
+
+
+def generateGeneBed(path_bed, path_tempBed):
+    df_bed = pr.read_bed(path_bed, as_df=True)
+    df_bed = df_bed.pipe(
+        lambda df: df.assign(
+            ItemRGB=0.0,
+            BlockCount=1,
+            BlockSizes=(df["End"] - df["Start"]).astype(str) + ",",
+            BlockStarts="0,",
+        )
+    )
+    df_bed.to_csv(path_tempBed, sep="\t", header=None, index=None)
+    return path_tempBed
+
+
+def _getIntrons(line, bed12):
+    if int(line.BlockCount) <= 1:
+        return None
+
+    ls_tuple = []
+    for start, length in zip(
+        line.BlockStarts.split(",")[:-1], line.BlockSizes.split(",")[:-1]
+    ):
+        start = int(start)
+        length = int(length)
+        ls_tuple.append(P.closedopen(start, start + length))
+    iv_exon = P.Interval(*ls_tuple)
+    iv_gene = P.closedopen(0, int(line.End) - int(line.Start))
+    iv_intron = iv_gene - iv_exon
+    ls_intron = list(iv_intron)
+    if not bed12:
+        if line.Strand == "-":
+            ls_intron = ls_intron[::-1]
+
+        ls_intronFeature = []
+        for intronNum, iv_singleIntron in zip(range(1, 1 + len(ls_intron)), ls_intron):
+            ls_intronFeature.append(
+                [
+                    f"{line.Name}_intron{intronNum}",
+                    line.Chromosome,
+                    line.Start + iv_singleIntron.lower,
+                    line.Start + iv_singleIntron.upper,
+                    line.Strand,
+                ]
+            )
+        return ls_intronFeature
+    else:
+        Start = line.Start + ls_intron[0].lower
+        BlockStarts = (
+            ",".join([str(x.lower - ls_intron[0].lower) for x in ls_intron]) + ","
+        )
+        BlockSizes = ",".join([str(x.upper - x.lower) for x in ls_intron]) + ","
+        BlockCount = len(ls_intron)
+        End = line.Start + ls_intron[-1].upper
+        sr_intron = pd.Series(
+            dict(
+                Chromosome=line.Chromosome,
+                Start=Start,
+                End=End,
+                Name=line.Name,
+                Score=line.Score,
+                Strand=line.Strand,
+                ThickStart=Start,
+                ThickEnd=End,
+                ItemRGB=line.ItemRGB,
+                BlockCounts=BlockCount,
+                BlockSizes=BlockSizes,
+                BlockStarts=BlockStarts,
+            )
+        )
+        return sr_intron
+
+
+def generateIntrons(path_bed, path_tempBed, bed12=True) -> pd.DataFrame:
+    df_bed = pr.read_bed(path_bed, as_df=True)
+    ls_introns = [
+        _getIntrons(x, bed12)
+        for x in tqdm(
+            df_bed.query("BlockCount > 1").itertuples(),
+            total=len(df_bed.query("BlockCount > 1")),
+        )
+    ]
+    if not bed12:
+        df_introns = pd.DataFrame(
+            [y for x in ls_introns for y in x],
+            columns=["Name", "Chromosome", "Start", "End", "Strand"],
+        )
+        df_introns["Chromosome"] = df_introns["Chromosome"].astype(str)
+        df_introns = df_introns.sort_values(["Chromosome", "Start"])
+    else:
+        df_introns = pd.DataFrame(
+            ls_introns,
+        )
+        df_introns["Chromosome"] = df_introns["Chromosome"].astype(str)
+        df_introns = df_introns.sort_values(["Chromosome", "Start"])
+    df_introns.to_csv(path_tempBed, sep="\t", header=None, index=None)
+    return path_tempBed
