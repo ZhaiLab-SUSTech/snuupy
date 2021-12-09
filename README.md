@@ -57,6 +57,7 @@ Commands:
   - abPOA
   - tqdm
   - pysam
+  - portion
 - R
   - scran
 - Snakemake 
