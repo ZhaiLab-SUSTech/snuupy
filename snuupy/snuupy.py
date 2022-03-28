@@ -490,13 +490,18 @@ def _addPolyATag(
 @click.option("-t", "--threads", required=False, help="threads", default=10)
 @click.option("--fasta", "fastaPath", help="genome fa")
 @click.option("--bed12", "is_bed12", is_flag=True, help="is bed12 format or not")
-def _polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads, is_bed12):
+@click.option("--bedtools", "path_bedtools", help="bedtools path", default="bedtools")
+def _polyAClusterDetected(
+    fastaPath, infile, gene_bed, out_suffix, threads, is_bed12, path_bedtools
+):
     """
     detect PolyA Cluster
     """
     from scripts.polyAClusterDetected import polyAClusterDetected
 
-    polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads, is_bed12)
+    polyAClusterDetected(
+        fastaPath, infile, gene_bed, out_suffix, threads, is_bed12, path_bedtools
+    )
 
 
 @main.command("generateMtx")
@@ -525,7 +530,7 @@ def _polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads, is_b
 @click.option(
     "--ir-list",
     "intronList",
-    default=False, 
+    default=False,
     type=str,
     help="only use those intron to calculate splicing matrix; if not provided, all intron will be used",
 )
@@ -607,5 +612,66 @@ def _multilayerClustering(multiMatPath, outPath, method):
 
     multiCluster(multiMatPath, outPath, method)
 
+
+@main.command("mergeResults")
+@click.option("-i", "dir_allResults", required=True, help="Directory containing all sample results")
+@click.option("-o", "dir_output", required=True, help="output directory")
+@click.option("--fasta", "path_genome", required=True, help="genome fa")
+@click.option(
+    "--gene-bed",
+    "path_geneBed",
+    required=True,
+    help="GENE BED , NOT BED 12 (transcripts)!",
+)
+@click.option("-t", "--threads", required=False, help="threads", default=10)
+@click.option("-s", "ls_sample", default=None, type=str, help="sample list, e.g. sample1,sample2,sample3")
+@click.option(
+    "--samtools",
+    "path_samtools",
+    default="samtools",
+    show_default=True,
+    help="samtools path",
+)
+@click.option("--bed12", "isBed12", is_flag=True, help="is bed12 format or not")
+@click.option("--tag", "geneTag", default="gi", help="gene name tag", show_default=True)
+@click.option(
+    "--ir/--no-ir", "irMode", default=True, help="generate splicing matrix or not"
+)
+@click.option(
+    "--ir-list",
+    "path_usedIntron",
+    default=False,
+    type=str,
+    help="only use those intron to calculate splicing matrix; if not provided, all intron will be used",
+)
+@click.option(
+    "--only-FullLength/--not-FullLength",
+    "onlyFullLength",
+    default=True,
+    show_default=True,
+    help="only use full length transcripts to generate splice matrix or not",
+)
+@click.option("--bedtools", "path_bedtools", help="bedtools path", default="bedtools")
+def _mergeResults(
+    dir_allResults,
+    dir_output,
+    path_genome,
+    path_geneBed,
+    threads=16,
+    ls_sample=None,
+    isBed12=False,
+    geneTag="gi",
+    irMode=True,
+    path_usedIntron=None,
+    onlyFullLength=True,
+    path_samtools="samtools",
+    path_bedtools="bedtools",
+):
+    """
+    merge results
+    """
+    from scripts.mergeResults import main as mergeResults
+    ls_sample = ls_sample.split(",") if ls_sample else None
+    mergeResults(dir_allResults, dir_output, path_genome, path_geneBed, threads, ls_sample, isBed12, geneTag, irMode, path_usedIntron, onlyFullLength, path_samtools, path_bedtools)
 
 main()

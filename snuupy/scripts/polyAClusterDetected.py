@@ -15,6 +15,27 @@ import click
 import pyranges as pr
 import pyfastx
 from concurrent.futures import ProcessPoolExecutor
+import sh
+from tempfile import TemporaryDirectory
+import pandas as pd
+
+
+def getSeqFromBedFile(df_bed, path_genome, path_bedtools):
+    dir_temp = TemporaryDirectory()
+    df_bed.to_csv(dir_temp.name + "t.bed", sep="\t", header=None, index=None)
+    sh.Command(path_bedtools).getfasta(
+        fi=path_genome,
+        bed=dir_temp.name + "t.bed",
+        bedOut=True,
+        s=True,
+        _long_sep=" ",
+        _long_prefix="-",
+        _out=dir_temp.name + "t.withFa.bed",
+    )
+    df_bedSeq = pd.read_table(
+        dir_temp.name + "t.withFa.bed", names=[*df_bed.columns, "Seq"]
+    )
+    return df_bedSeq
 
 
 def get_entropy(site_counter, total_count):
@@ -33,7 +54,7 @@ STRAND_TO_BOOL = {"-": True, "+": False}
 
 def get_three_end(infile, gene_id, gene_model):
     """
-    obtain position of the polyadenylated read 3’end 
+    obtain position of the polyadenylated read 3’end
     """
     chrom, start, end, _, strand = gene_model.loc[gene_id, :].values
     strand = STRAND_TO_BOOL[strand]
@@ -70,7 +91,6 @@ def get_three_end(infile, gene_id, gene_model):
             else:
                 pac_list.append([polya_site])
 
-    
     major_cluster_site_count = 0
     summit = []
 
@@ -129,34 +149,59 @@ def get_three_end(infile, gene_id, gene_model):
         polya_cluster_summit_last,
     )
 
+def _fc(line, length=20):
+    dt_line = line.to_dict()
+    if dt_line['Strand'] == '+':
+        dt_line['Start'] = dt_line['End'] - length
+    else:
+        dt_line['Start'] =  dt_line['Start'] + 1 
+        dt_line['End'] = dt_line['Start'] + length
+    sr_result = pd.Series(dt_line)
+    return sr_result
 
-def filterPAC(fastaPath, bedPath, bedSummitPath, fillterPolyASitePath):
-    genomeFa = pyfastx.Fasta(fastaPath)
-    polyAClusterBed = pr.read_bed(bedSummitPath, True)
-    polyAClusterBed['Chromosome'] = polyAClusterBed['Chromosome'].astype(str)
-    polyAClusterBed["seq"] = polyAClusterBed.apply(
-        lambda x: genomeFa[x["Chromosome"]][x["Start"] - 10 : x["End"] + 10].seq, axis=1
+def filterPAC(fastaPath, bedPath, bedSummitPath, fillterPolyASitePath, path_bedtools):
+    df_pac = pr.read_bed(bedSummitPath, as_df=True)
+    df_pacTerminal = df_pac.apply(_fc, axis=1, length=20)
+    df_pacTerminalSeq = getSeqFromBedFile(df_pacTerminal, fastaPath, path_bedtools)
+    df_pacTerminalSeqFiltered = df_pacTerminalSeq.loc[~(df_pacTerminalSeq['Seq'].str[-3:] == 'AAA')]
+    df_pacTerminalSeqFiltered = df_pacTerminalSeqFiltered.assign(
+        Gene=lambda df: df["Name"].str.split("_").str[:-1].str.join("_")
     )
-    polyAClusterBed["seqLength"] = polyAClusterBed["seq"].map(len)
-    polyAClusterBed["Ratio"] = (
-        polyAClusterBed.apply(
-            lambda x: x["seq"].count("A")
-            if x["Strand"] == "+"
-            else x["seq"].count("T"),
-            axis=1,
-        )
-        / polyAClusterBed["seqLength"]
-    )
-    usePolyASite = polyAClusterBed.query("Ratio <= 0.5")["Name"]
+    ls_usedGene = df_pacTerminalSeqFiltered.value_counts('Gene').pipe(lambda sr:sr[sr > 1]).index.tolist()
+    df_pacTerminalSeqFiltered = df_pacTerminalSeqFiltered.query("Gene in @ls_usedGene")
+    ls_usePac = df_pacTerminalSeqFiltered['Name'].to_list()
+
+    # old version
+    # genomeFa = pyfastx.Fasta(fastaPath)
+    # polyAClusterBed = pr.read_bed(bedSummitPath, True)
+    # polyAClusterBed["Chromosome"] = polyAClusterBed["Chromosome"].astype(str)
+    # polyAClusterBed["seq"] = polyAClusterBed.apply(
+    #     lambda x: genomeFa[x["Chromosome"]][x["Start"] - 10 : x["End"] + 10].seq, axis=1
+    # )
+    # polyAClusterBed["seqLength"] = polyAClusterBed["seq"].map(len)
+    # polyAClusterBed["Ratio"] = (
+    #     polyAClusterBed.apply(
+    #         lambda x: x["seq"].count("A")
+    #         if x["Strand"] == "+"
+    #         else x["seq"].count("T"),
+    #         axis=1,
+    #     )
+    #     / polyAClusterBed["seqLength"]
+    # )
+    # usePolyASite = polyAClusterBed.query("Ratio <= 0.5")["Name"]
     polyAClusterRawRangeBed = pr.read_bed(bedPath, True)
-    polyAClusterRawRangeBed['Chromosome'] = polyAClusterRawRangeBed['Chromosome'].astype(str)
-    polyAClusterPassedRangeBed = polyAClusterRawRangeBed.query("Name in @usePolyASite")
+    polyAClusterRawRangeBed["Chromosome"] = polyAClusterRawRangeBed[
+        "Chromosome"
+    ].astype(str)
+    polyAClusterPassedRangeBed = polyAClusterRawRangeBed.query("Name in @ls_usePac")
     polyAClusterPassedRangeBed.to_csv(
         fillterPolyASitePath, sep="\t", header=None, index=None
     )
 
 
-def polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads, is_bed12=False):
+def polyAClusterDetected(
+    fastaPath, infile, gene_bed, out_suffix, threads, is_bed12=False, path_bedtools='bedtools'
+):
     try:
         os.mkdir(out_suffix)
     except:
@@ -165,7 +210,10 @@ def polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads, is_be
     gene_model["Chromosome"] = gene_model["Chromosome"].astype(str)
     if is_bed12:
         # transfer bed12 to bed
-        gene_model = gene_model.assign(Gene = lambda df:df['Name'].str.split("\|").str[-1], GeneBiotype = lambda df:df['Name'].str.split("\|").str[-2])
+        gene_model = gene_model.assign(
+            Gene=lambda df: df["Name"].str.split("\|").str[-1],
+            GeneBiotype=lambda df: df["Name"].str.split("\|").str[-2],
+        )
         gene_model = gene_model.groupby("Gene").agg(
             {
                 "Chromosome": lambda x: x.iat[0],
@@ -175,26 +223,32 @@ def polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads, is_be
                 "GeneBiotype": lambda x: x.iat[0],
             }
         )
-        gene_model = gene_model.reset_index().pipe(lambda df:df.assign(
-            Name=df['Gene'] + '|' + df['GeneBiotype'] + '|' + df['Gene'],
-            Score=0,
-            ThickStart=df['Start'],
-            ThickEnd=df['End'],
-            ItemRGB=0.0,
-            BlockCount=1,
-            BlockSizes=(df['End']-df['Start']).astype(str) + ',',
-            BlockStarts='0,'
-        ))
-        gene_model = gene_model.reindex(
-            columns=[
-                "Chromosome",
-                "Start",
-                "End",
-                "Gene",
-                "Score",
-                "Strand",
-            ]
-        ).sort_values(['Chromosome', 'Start']).rename(columns={'Gene':'Name'})
+        gene_model = gene_model.reset_index().pipe(
+            lambda df: df.assign(
+                Name=df["Gene"] + "|" + df["GeneBiotype"] + "|" + df["Gene"],
+                Score=0,
+                ThickStart=df["Start"],
+                ThickEnd=df["End"],
+                ItemRGB=0.0,
+                BlockCount=1,
+                BlockSizes=(df["End"] - df["Start"]).astype(str) + ",",
+                BlockStarts="0,",
+            )
+        )
+        gene_model = (
+            gene_model.reindex(
+                columns=[
+                    "Chromosome",
+                    "Start",
+                    "End",
+                    "Gene",
+                    "Score",
+                    "Strand",
+                ]
+            )
+            .sort_values(["Chromosome", "Start"])
+            .rename(columns={"Gene": "Name"})
+        )
 
     gene_model = gene_model.set_index(["Name"])
 
@@ -248,4 +302,5 @@ def polyAClusterDetected(fastaPath, infile, gene_bed, out_suffix, threads, is_be
         f"{out_suffix}polya_cluster.bed",
         f"{out_suffix}polya_cluster.summit.bed",
         f"{out_suffix}polya_cluster.filtered.bed",
+        path_bedtools
     )

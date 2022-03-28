@@ -26,7 +26,7 @@ def parseReadApaInfo(apaClusterPath, inBamPath, geneTag, expressionInfo):
     apaCluster = pr.read_bed(apaClusterPath, True)
     apaCluster["Chromosome"] = apaCluster["Chromosome"].astype(str)
     apaCluster["Name"] = apaCluster["Name"] + "_APA"
-    apaCluster["geneName"] = apaCluster["Name"].str.split("_").str[0]
+    apaCluster["geneName"] = apaCluster["Name"].str.split("_").str[:-1].str.join("_")
     apaCluster = apaCluster.reindex(["geneName", "Name", "Start", "End"], axis=1)
     apaClusterDict = defaultdict(lambda: {})
     for line in apaCluster.itertuples():
