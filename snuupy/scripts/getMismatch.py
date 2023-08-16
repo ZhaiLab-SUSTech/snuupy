@@ -44,6 +44,7 @@ def getAlignScore(line):
         umiScore = barcodeUmiScore - barcodeScore
         return [str(x) for x in [barcodeUmiScore, barcodeScore, umiScore, mappingStrand]]
     except:
+        print(f"Trigger error during process barcode: {barcodeUmi}, Corresponding unmapped seq: {unmappedSeq}")
         assert False, f"Trigger error during process barcode: {barcodeUmi}, Corresponding unmapped seq: {';'.join(unmappedSeq)}"
 
 

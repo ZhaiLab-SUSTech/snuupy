@@ -7,6 +7,7 @@ from joblib import Parallel, delayed
 import scanpy as sc
 import muon as mu
 from functools import reduce
+import os
 from .polyAClusterDetected import polyAClusterDetected
 from .generateMtx import generateMtx
 
@@ -79,35 +80,41 @@ def main(
     lsPath_allTagedBam = [
         f"{dir_allResults}/{x}/{BAM_RELATIVE_PATH}" for x in ls_sample
     ]
-    bam_merged = pysam.AlignmentFile(
-        path_mergedBam, "w", template=pysam.AlignmentFile(lsPath_allTagedBam[0], "r")
-    )
-    for sample, path_bam in zip(ls_sample, lsPath_allTagedBam):
-        bam_sample = pysam.AlignmentFile(path_bam, "r")
-        bamCounts = bam_sample.count()
-        bam_sample.reset()
-        for read in tqdm.tqdm(bam_sample, sample, total=bamCounts):
-            read.qname = sample + "-" + read.qname
-            bam_merged.write(read)
-        bam_sample.close()
-    bam_merged.close()
-    sh.Command(path_samtools).sort(
-        path_mergedBam, O="BAM", o=path_mergedSortedBam, **{"@": threads}
-    )
-    sh.Command(path_samtools).index(path_mergedSortedBam, **{"@": threads})
-    sh.rm(path_mergedBam)
+    if os.path.exists(path_mergedBam):
+        logger.info(f"{path_mergedBam} already exists, skip merging")
+    else:
+        bam_merged = pysam.AlignmentFile(
+            path_mergedBam, "w", template=pysam.AlignmentFile(lsPath_allTagedBam[0], "r")
+        )
+        for sample, path_bam in zip(ls_sample, lsPath_allTagedBam):
+            bam_sample = pysam.AlignmentFile(path_bam, "r")
+            bamCounts = bam_sample.count()
+            bam_sample.reset()
+            for read in tqdm.tqdm(bam_sample, sample, total=bamCounts):
+                read.qname = sample + "-" + read.qname
+                bam_merged.write(read)
+            bam_sample.close()
+        bam_merged.close()
+        sh.Command(path_samtools).sort(
+            path_mergedBam, O="BAM", o=path_mergedSortedBam, **{"@": threads}
+        )
+        sh.Command(path_samtools).index(path_mergedSortedBam, **{"@": threads})
+        sh.rm(path_mergedBam)
 
     ## get pac
     dir_pacResults = dir_output + "/pac/"
-    polyAClusterDetected(
-        path_genome,
-        path_mergedSortedBam,
-        path_geneBed,
-        dir_pacResults,
-        threads,
-        isBed12,
-        path_bedtools,
-    )
+    if os.path.exists(dir_pacResults + 'polya_cluster.filtered.bed'):
+        logger.info(f"{dir_pacResults} already exists, skip polya cluster detection")
+    else:
+        polyAClusterDetected(
+            path_genome,
+            path_mergedSortedBam,
+            path_geneBed,
+            dir_pacResults,
+            threads,
+            isBed12,
+            path_bedtools,
+        )
 
     ## generate matrix
     path_pacBed = dir_pacResults + "/polya_cluster.filtered.bed"

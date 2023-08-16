@@ -164,11 +164,11 @@ def filterPAC(fastaPath, bedPath, bedSummitPath, fillterPolyASitePath, path_bedt
     df_pacTerminal = df_pac.apply(_fc, axis=1, length=20)
     df_pacTerminalSeq = getSeqFromBedFile(df_pacTerminal, fastaPath, path_bedtools)
     df_pacTerminalSeqFiltered = df_pacTerminalSeq.loc[~(df_pacTerminalSeq['Seq'].str[-3:] == 'AAA')]
-    df_pacTerminalSeqFiltered = df_pacTerminalSeqFiltered.assign(
-        Gene=lambda df: df["Name"].str.split("_").str[:-1].str.join("_")
-    )
-    ls_usedGene = df_pacTerminalSeqFiltered.value_counts('Gene').pipe(lambda sr:sr[sr > 1]).index.tolist()
-    df_pacTerminalSeqFiltered = df_pacTerminalSeqFiltered.query("Gene in @ls_usedGene")
+    # df_pacTerminalSeqFiltered = df_pacTerminalSeqFiltered.assign(
+    #     Gene=lambda df: df["Name"].str.split("_").str[:-1].str.join("_")
+    # )
+    # ls_usedGene = df_pacTerminalSeqFiltered.value_counts('Gene').pipe(lambda sr:sr[sr > 1]).index.tolist()
+    # df_pacTerminalSeqFiltered = df_pacTerminalSeqFiltered.query("Gene in @ls_usedGene")
     ls_usePac = df_pacTerminalSeqFiltered['Name'].to_list()
 
     # old version

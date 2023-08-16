@@ -39,9 +39,11 @@ def parseReadApaInfo(apaClusterPath, inBamPath, geneTag, expressionInfo):
         i = 0
         for read in inBam:
             i += 1
+            if not read.has_tag(geneTag):
+                continue
             readGene = read.get_tag(geneTag)
-            geneApaInfo = apaClusterDict.get(readGene, "None")
-            if geneApaInfo == "None":
+            geneApaInfo = apaClusterDict.get(readGene, None)
+            if geneApaInfo is None:
                 readApaName = f"{readGene}_N_APA"
             else:
                 if read.is_reverse:
